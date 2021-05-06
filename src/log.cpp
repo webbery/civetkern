@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <execinfo.h>
 #include <pwd.h>
+#include <sys/syscall.h>
 #elif defined(WIN32)
 #include <direct.h>
 #include <io.h>
@@ -63,21 +64,22 @@ namespace caxios {
   }
 
   unsigned int threadid() {
-    auto tid = std::this_thread::get_id();
 #ifdef _WIN32
+    auto tid = std::this_thread::get_id();
     return *(_Thrd_id_t*)&tid;
-#elif __APPLE__
-    return pthread_mach_thread_np(*(pthread_t*)&tid);
 #else
-    return *(__gthread_t*)&tid;
+    thread_local int tid = syscall(SYS_gettid);
+    return tid;
 #endif
   }
+  FILE* test;
 
   class FLog {
   public:
     FLog(){
     }
     ~FLog(){
+    fclose(test);
       fclose(_file);
     }
 
@@ -85,6 +87,7 @@ namespace caxios {
       std::string logname(fname);
       std::string mode("");
       if (flag == 0) mode = "write";
+    test = fopen("1111", "a+");
       int idx = 1;
       std::string filename;
       while (true) {
@@ -114,6 +117,8 @@ namespace caxios {
       }
       root += "/";
 #endif
+fputs((root + filename+"\n").c_str(), test);
+      fflush(test);
       _file = fopen((root + filename).c_str(), "a+");
       if (_file) return true;
       return false;

@@ -32,7 +32,7 @@
       'cflags_cc': [
         '-std=c++17',
         '-frtti',
-        '-Wno-pessimizing-move'
+        '-Wnopessimizing-move'
       ],
       "cflags!": [
         '-fno-exceptions'
@@ -51,6 +51,7 @@
           '-fexceptions',
           '-Wall',
           '-mmacosx-version-min=10.15',
+          '-Wno-pessimizing-move'
           '-O3'
         ]
       },
