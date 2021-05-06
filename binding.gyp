@@ -32,7 +32,7 @@
       'cflags_cc': [
         '-std=c++17',
         '-frtti',
-        '-Wnopessimizing-move'
+        '-Wno-pessimizing-move'
       ],
       "cflags!": [
         '-fno-exceptions'
