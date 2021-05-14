@@ -39,7 +39,7 @@ namespace caxios{
   public:
     static char _curVersion;
 
-    CStorageProxy(const std::string& dbpath, const std::string& name, DBFlag flag, size_t size);
+    CStorageProxy(const std::string& dbpath, DBFlag flag, size_t size);
     ~CStorageProxy();
 
     MDB_dbi OpenDatabase(const std::string& dbname);
@@ -56,6 +56,8 @@ namespace caxios{
     MDB_cursor* OpenCursor(const std::string& dbname);
     int MoveNext(MDB_cursor*, MDB_val&, MDB_val&);
     void CloseCursor(MDB_cursor*);
+    MDB_txn* BeginBin();
+    bool CommitBin();
     MDB_txn* Begin();
     bool Commit();
 
@@ -87,6 +89,7 @@ namespace caxios{
 
   private:
     CDatabase* m_pCurrent = nullptr;
-    CDatabase* m_pUpgrade = nullptr;
+    CDatabase* m_pCurrentBin = nullptr;
+    // CDatabase* m_pUpgrade = nullptr;
   };
 }

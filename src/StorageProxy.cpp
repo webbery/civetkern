@@ -9,6 +9,9 @@
 #include <errno.h>
 #include <filesystem>
 
+#define DBSCHEMA  "schema"
+#define DBBIN  "bin"
+
 namespace caxios{
   namespace {
     std::mutex g_qMutex;
@@ -72,21 +75,32 @@ namespace caxios{
 
   char CStorageProxy::_curVersion;
 
-  CStorageProxy::CStorageProxy(const std::string& dbpath, const std::string& name, DBFlag flag, size_t size)
-    :m_dir(dbpath), m_dbname(name)
+  CStorageProxy::CStorageProxy(const std::string& dbpath, DBFlag flag, size_t size)
+    :m_dir(dbpath), m_dbname(DBSCHEMA)
   {
-    m_pCurrent = new CDatabase(dbpath, name, flag, size);
+    m_pCurrent = new CDatabase(dbpath, DBSCHEMA, flag, size);
+    m_pCurrentBin = new CBinDatabase(dbpath, DBBIN, flag, 2*size);
     initKeyword();
+    // cache bin table
+    // MDB_dbi dbi = m_pCurrent->OpenDatabase(TABLE_SCHEMA);
+    // if (dbi != -1) {
+    //   m_mDBs[TABLE_SCHEMA] = dbi;
+    //   void* pData = nullptr;
+    //   uint32_t len = 0;
+    //   m_pCurrent->Get(dbi, SCHEMA_INFO::BinTable, pData, len);
+    // }
   }
 
   CStorageProxy::~CStorageProxy()
   {
     m_bExit = true;
+    m_pCurrentBin->CloseDatabase(0);
     ReleaseCurrentDB();
     if (m_tUpgrade.joinable()) {
       m_tUpgrade.join();
       ReplaceDB();
     }
+    delete m_pCurrentBin;
   }
 
   MDB_dbi CStorageProxy::OpenDatabase(const std::string& dbname)
@@ -108,18 +122,18 @@ namespace caxios{
 
   bool CStorageProxy::Put(const std::string& dbname, uint32_t key, void* pData, uint32_t len, int flag /*= MDB_CURRENT*/)
   {
-    if (m_pUpgrade) {
-      addDML(dbname, key, pData, len, flag);
-    }
+    // if (m_pUpgrade) {
+    //   addDML(dbname, key, pData, len, flag);
+    // }
     auto dbi = getDBI(dbname);
     return m_pCurrent->Put(dbi, key, pData, len, flag);
   }
 
   bool CStorageProxy::Put(const std::string& dbname, const std::string& key, void* pData, uint32_t len, int flag /*= MDB_CURRENT*/)
   {
-    if (m_pUpgrade) {
-      addDML(dbname, key, pData, len, flag);
-    }
+    // if (m_pUpgrade) {
+    //   addDML(dbname, key, pData, len, flag);
+    // }
     auto dbi = getDBI(dbname);
     return m_pCurrent->Put(dbi, key, pData, len, flag);
   }
@@ -150,18 +164,18 @@ namespace caxios{
 
   bool CStorageProxy::Del(const std::string& dbname, uint32_t key)
   {
-    if (m_pUpgrade) {
-      addDML(dbname, key);
-    }
+    // if (m_pUpgrade) {
+    //   addDML(dbname, key);
+    // }
     auto dbi = getDBI(dbname);
     return m_pCurrent->Del(dbi, key);
   }
 
   bool CStorageProxy::Del(const std::string& dbname, const std::string& key)
   {
-    if (m_pUpgrade) {
-      addDML(dbname, key);
-    }
+    // if (m_pUpgrade) {
+    //   addDML(dbname, key);
+    // }
     auto dbi = getDBI(dbname);
     return m_pCurrent->Del(dbi, key);
   }
@@ -181,6 +195,12 @@ namespace caxios{
   {
     return m_pCurrent->CloseCursor(pDurcor);
   }
+  MDB_txn* CStorageProxy::BeginBin(){
+    return m_pCurrentBin->Begin();
+  }
+  bool CStorageProxy::CommitBin() {
+    return m_pCurrentBin->Commit();
+  }
 
   MDB_txn* CStorageProxy::Begin()
   {
@@ -195,14 +215,15 @@ namespace caxios{
   ITable* CStorageProxy::GetMetaTable(const std::string& name)
   {
     if (m_mTables.find(name) != m_mTables.end()) return m_mTables[name];
-    void* pData = nullptr;
-    uint32_t len = 0;
-    this->Get(TABLE_MATCH_META, name, pData, len);
-    if (len == 0) return nullptr;
-    //std::vector<uint8_t> vInfo((uint8_t*)pData, (uint8_t*)pData + len);
-    //nlohmann::json info = nlohmann::json::from_cbor(vInfo);
-    m_mTables[name] = new TableMeta(this, name/*, info["type"]*/);
-    return m_mTables[name];
+    return nullptr;
+    // void* pData = nullptr;
+    // uint32_t len = 0;
+    // this->Get(TABLE_MATCH_META, name, pData, len);
+    // if (len == 0) return nullptr;
+    // std::vector<uint8_t> vInfo((uint8_t*)pData, (uint8_t*)pData + len);
+    // nlohmann::json info = nlohmann::json::from_cbor(vInfo);
+    // m_mTables[name] = new TableMeta(m_pCurrent, name/*, info["type"]*/);
+    // return m_mTables[name];
   }
 
   ITable* CStorageProxy::GetOrCreateMetaTable(const std::string& name, const std::string& type)
@@ -212,8 +233,12 @@ namespace caxios{
       nlohmann::json meta;
       meta["type"] = type;
       auto sInfo = nlohmann::json::to_cbor(meta);
-      this->Put(TABLE_MATCH_META, name, sInfo.data(), sInfo.size());
-      m_mTables[name] = new TableMeta(this, name/*, type*/);
+      m_pCurrent->Put(getDBI(TABLE_MATCH_META), name, sInfo.data(), sInfo.size());
+      if (type == "bin") {
+        m_mTables[name] = new TableMeta(m_pCurrentBin, name/*, type*/);
+      } else {
+        m_mTables[name] = new TableMeta(m_pCurrent, name/*, type*/);
+      }
       return m_mTables[name];
     }
     return pTable;
@@ -325,7 +350,7 @@ namespace caxios{
   {
     std::string upgradePath = "/" + m_dbname + ".tmp";
     m_pCurrent->Copy2(m_dir + upgradePath);
-    m_pUpgrade = new CDatabase(m_dir, upgradePath, ReadWrite, MAX_SCHEMA_DB_SIZE);
+    // m_pUpgrade = new CDatabase(m_dir, upgradePath, ReadWrite, MAX_SCHEMA_DB_SIZE);
     std::map<std::string, MDB_dbi > mDBs;
     // process queue
     while (!m_bExit) {
@@ -348,38 +373,38 @@ namespace caxios{
       g_dqDML.pop_front();
       ExecuteDML(dml, mDBs);
     }
-    m_pUpgrade->Commit();
+    // m_pUpgrade->Commit();
     // finish
-    m_pUpgrade->CloseDatabase(0);
-    delete m_pUpgrade;
-    m_pUpgrade = nullptr;
+    // m_pUpgrade->CloseDatabase(0);
+    // delete m_pUpgrade;
+    // m_pUpgrade = nullptr;
   }
 
   void CStorageProxy::ExecuteDML(const DML& dml, std::map<std::string, MDB_dbi >& dbs)
   {
-    if (dml._type == DML_None) return;
-    if (dml._dbname == "type") {
-      T_LOG("uery", "11");
-    }
-    if (dbs.find(dml._dbname) == dbs.end()) {
-      MDB_dbi dbi = m_pUpgrade->OpenDatabase(dml._dbname);
-      if (dbi == -1) return;
-      dbs[dml._dbname] = dbi;
-    }
-    if (dml._type == DML_Put && dml._ktype == KeyType_UInt32) {
-      uint32_t key = *(uint32_t*)dml._key.data();
-      m_pUpgrade->Put(dbs[dml._dbname], key, (void*)dml._data.data(), dml._data.size(), MDB_CURRENT);
-    }
-    else if (dml._type == DML_Put && dml._ktype == KeyType_String) {
-      m_pUpgrade->Put(dbs[dml._dbname], dml._key, (void*)dml._data.data(), dml._data.size(), MDB_CURRENT);
-    }
-    else if (dml._type == DML_Del && dml._ktype == KeyType_UInt32) {
-      uint32_t key = *(uint32_t*)dml._key.data();
-      m_pUpgrade->Del(dbs[dml._dbname], key);
-    }
-    else if (dml._type == DML_Del && dml._ktype == KeyType_String) {
-      m_pUpgrade->Del(dbs[dml._dbname], dml._key);
-    }
+    // if (dml._type == DML_None) return;
+    // if (dml._dbname == "type") {
+    //   T_LOG("uery", "11");
+    // }
+    // if (dbs.find(dml._dbname) == dbs.end()) {
+    //   MDB_dbi dbi = m_pUpgrade->OpenDatabase(dml._dbname);
+    //   if (dbi == -1) return;
+    //   dbs[dml._dbname] = dbi;
+    // }
+    // if (dml._type == DML_Put && dml._ktype == KeyType_UInt32) {
+    //   uint32_t key = *(uint32_t*)dml._key.data();
+    //   m_pUpgrade->Put(dbs[dml._dbname], key, (void*)dml._data.data(), dml._data.size(), MDB_CURRENT);
+    // }
+    // else if (dml._type == DML_Put && dml._ktype == KeyType_String) {
+    //   m_pUpgrade->Put(dbs[dml._dbname], dml._key, (void*)dml._data.data(), dml._data.size(), MDB_CURRENT);
+    // }
+    // else if (dml._type == DML_Del && dml._ktype == KeyType_UInt32) {
+    //   uint32_t key = *(uint32_t*)dml._key.data();
+    //   m_pUpgrade->Del(dbs[dml._dbname], key);
+    // }
+    // else if (dml._type == DML_Del && dml._ktype == KeyType_String) {
+    //   m_pUpgrade->Del(dbs[dml._dbname], dml._key);
+    // }
   }
 
   void CStorageProxy::ReplaceDB()

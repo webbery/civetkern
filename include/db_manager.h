@@ -8,10 +8,13 @@
 #include "Keyword.h"
 #include "Condition.h"
 #include "Table.h"
+#include "RPN.h"
 
 #define TABLE_FILEID        32    // "file_cur_id"
 
 namespace caxios {
+  namespace tpp = tao::pegtl::parse_tree;
+
   template<DataType Q, CompareType C> struct CQuery;
   template<> struct CQuery<QT_String, CT_IN>;
   template<> struct CQuery<QT_Color, CT_EQUAL>;
@@ -47,9 +50,11 @@ namespace caxios {
     bool UpdateClassName(const std::string& oldName, const std::string& newName);
     bool UpdateFileMeta(const std::vector<FileID>& filesID, const nlohmann::json& mutation);
     bool Query(const std::string& query, std::vector< FileInfo>& filesInfo);
+    bool Insert(const std::string& sql);
+    bool Remove(const std::string& sql);
 
   private:
-    void InitDB(CStorageProxy*& pDB, const char* dir, const char* name, size_t size);
+    void InitDB(CStorageProxy*& pDB, const char* dir, size_t size);
     void InitTable(const std::string& meta);
     void InitMap();
     void TryUpdate(const std::string& meta);
@@ -95,6 +100,7 @@ namespace caxios {
     char GetSnapStep(FileID fileID, nlohmann::json&);
     Snap GetFileSnap(FileID);
     WordIndex GetWordIndex(const std::string& word);
+    std::unique_ptr< tpp::node > generate(const std::string& sql);
 
     template<typename T>
     std::vector<std::string> GetWordByIndex(const T* const wordsIndx, size_t cnt) {

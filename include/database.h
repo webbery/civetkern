@@ -12,14 +12,17 @@ namespace caxios{
 
 
   enum DATABASE_OPERATOR {
-    NORMAL = 0,     // Î´²Ù×÷×´Ì¬
-    TRANSACTION,    // ÓÐÊý¾ÝÐ´Èë, ´ýÌá½»
+    NORMAL = 0,     // Î´ï¿½ï¿½ï¿½ï¿½×´Ì¬
+    TRANSACTION,    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½, ï¿½ï¿½ï¿½á½»
   };
+
+  // put flag of civetkern
+  #define CVK_BIN   0x80
 
   class CDatabase {
   public:
     CDatabase(const std::string& dbpath, const std::string& name, DBFlag flag, size_t size);
-    ~CDatabase();
+    virtual ~CDatabase();
 
     MDB_dbi OpenDatabase(const std::string& dbname);
     void CloseDatabase(MDB_dbi dbi);
@@ -44,6 +47,12 @@ namespace caxios{
     unsigned int m_flag = 0;
     MDB_txn* m_pTransaction = nullptr;
     DATABASE_OPERATOR m_dOperator = NORMAL;
+  };
+
+  class CBinDatabase: public CDatabase {
+  public:
+    CBinDatabase(const std::string& dbpath, const std::string& name, DBFlag flag, size_t size)
+      : CDatabase(dbpath, name, flag, size) {}
   };
 }
 

@@ -3,6 +3,7 @@
 #include <variant>
 #include "datum_type.h"
 #include "StorageProxy.h"
+#include "database.h"
 #include <string.h>
 #include <limits>
 #include "ISymbol.h"
@@ -34,6 +35,7 @@
 
 enum class SCHEMA_INFO {
   Version = 1,
+  BinTable = 2,
 };
 
 namespace caxios {
@@ -58,7 +60,7 @@ namespace caxios {
     {
       *_refs += 1;
     }
-    Iterator(CStorageProxy* pDatabase, const std::string& table)
+    Iterator(CDatabase* pDatabase, MDB_dbi table)
       :_end(false)
       , _pDatabase(pDatabase)
     {
@@ -105,7 +107,7 @@ namespace caxios {
     int* _refs = nullptr;
     MDB_val _key;
     MDB_val _datum;
-    CStorageProxy* _pDatabase = nullptr;
+    CDatabase* _pDatabase = nullptr;
     MDB_cursor* _cursor = nullptr;
   };
 
@@ -132,7 +134,7 @@ namespace caxios {
   class ITable {
   public:
     //std::string Name() { return _table; }
-    ITable(CStorageProxy* pDB) :  _pDatabase(pDB) {}
+    ITable(CDatabase* pDB) :  _pDatabase(pDB) {}
     virtual ~ITable() {}
 
     virtual bool Add(const std::string& value, const std::vector<FileID>& fileid) = 0;
@@ -143,14 +145,14 @@ namespace caxios {
     virtual Iterator begin() = 0;
     virtual Iterator end() = 0;
   protected:
-    CStorageProxy* _pDatabase = nullptr;
+    CDatabase* _pDatabase = nullptr;
   };
 
   class ITriger {
   public:
-    ITriger(CStorageProxy* pDB) : _pDatabase(pDB) {}
+    ITriger(CDatabase* pDB) : _pDatabase(pDB) {}
     virtual void Trig() = 0;
   private:
-    CStorageProxy* _pDatabase = nullptr;
+    CDatabase* _pDatabase = nullptr;
   };
 }

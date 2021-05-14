@@ -9,7 +9,7 @@ namespace caxios {
       TABLE_CLASS2FILE,
     };
   }
-  TableClass::TableClass(CStorageProxy* pDatabase)
+  TableClass::TableClass(CDatabase* pDatabase)
     :ITable(pDatabase)
   {
 

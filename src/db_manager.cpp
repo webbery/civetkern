@@ -32,9 +32,6 @@
 #define BIT_CLASS   (1<<BIT_CLASS_OFFSET)
 //#define BIT_ANNO  (1<<3)
 
-#define DBSCHEMA  "schema"
-#define DBBIN  "bin"
-
 namespace caxios {
   const char* g_tables[] = {
     TABLE_SCHEMA,
@@ -71,8 +68,7 @@ namespace caxios {
   DBManager::DBManager(const std::string& dbdir, int flag, const std::string& meta/* = ""*/)
   {
     _flag = (flag == 0 ? ReadWrite : ReadOnly);
-    InitDB(m_pDatabase, dbdir.c_str(), DBSCHEMA, MAX_SCHEMA_DB_SIZE);
-    //InitDB(m_pBinaryDB, dbdir.c_str(), DBBIN, MAX_BIN_DB_SIZE);
+    InitDB(m_pDatabase, dbdir.c_str(), MAX_SCHEMA_DB_SIZE);
     
     // open all database
     InitTable(meta);
@@ -173,12 +169,16 @@ namespace caxios {
   {
     auto existFiles = mapExistFiles(files);
     if (existFiles.size() == 0) return false;
-    WRITE_BEGIN();
     std::string name = meta["name"];
     std::string type = meta["type"];
     if (type == "bin") {
-
+      m_pDatabase->BeginBin();
+      auto pTable = m_pDatabase->GetOrCreateMetaTable(name, type);
+      // pTable->Add()
+      m_pDatabase->CommitBin();
+      return true;
     }
+    WRITE_BEGIN();
     // add meta to file
     void* pData = nullptr;
     uint32_t len = 0;
@@ -717,13 +717,17 @@ namespace caxios {
     return true;
   }
 
+  std::unique_ptr< tpp::node > DBManager::generate(const std::string& sql) {
+    namespace pegtl = TAO_PEGTL_NAMESPACE;
+    pegtl::memory_input input(sql, "");
+    T_LOG("sql", "sql: %s", sql.c_str());
+    auto root = pegtl::parse_tree::parse<caxios::QueryGrammar, caxios::query_selector>(input);
+    return std::move(root);
+  }
+
   bool DBManager::Query(const std::string& query, std::vector<FileInfo>& filesInfo)
   {
-    namespace pegtl = TAO_PEGTL_NAMESPACE;
-    pegtl::memory_input input(query, "");
-    T_LOG("query", "sql: %s", query.c_str());
-    auto root = pegtl::parse_tree::parse<caxios::QueryGrammar, caxios::query_selector>(input);
-    RPN rpn(std::move(root));
+    RPN rpn(generate(query));
     //rpn.debug();
     T_LOG("query", "rpn generate finish");
     std::stack<std::unique_ptr<ISymbol>> sSymbol;
@@ -797,19 +801,24 @@ namespace caxios {
     if (sSymbol.size() == 0) return false;
     auto result = std::move(sSymbol.top());
     std::unique_ptr<ValueArray> array = dynamic_unique_cast<ValueArray>(std::move(result));
-    //sSymbol.pop();
-    //auto result2 = std::move(sSymbol.top());
-    //T_LOG("query", "result2: %s", result2->Value().c_str());
-    //std::unique_ptr<ValueArray> array2 = dynamic_unique_cast<ValueArray>(std::move(result));
-    //T_LOG("query", "result2: %s", format_vector(array2->GetArray<FileID>()).c_str());
     return GetFilesInfo(array->GetArray<FileID>(), filesInfo);
   }
 
-  void DBManager::InitDB(CStorageProxy*& pDB, const char* dir, const char* name, size_t size)
+  bool DBManager::Insert(const std::string& sql) {
+    RPN rpn(generate(sql));
+    return true;
+  }
+
+  bool DBManager::Remove(const std::string& sql) {
+    RPN rpn(generate(sql));
+    return true;
+  }
+
+  void DBManager::InitDB(CStorageProxy*& pDB, const char* dir, size_t size)
   {
     T_LOG("init", "max db size: %d", size);
     if (pDB == nullptr) {
-      pDB = new CStorageProxy(dir, name, _flag, size);
+      pDB = new CStorageProxy(dir, _flag, size);
     }
     if (pDB == nullptr) {
       std::cerr << "new CDatabase fail.\n";
@@ -826,6 +835,7 @@ namespace caxios {
     if (!meta.empty() && meta.size() > 4 && meta != "[]") {
       ParseMeta(meta);
     }
+    // open bin table
   }
 
   void DBManager::TryUpdate(const std::string& meta)

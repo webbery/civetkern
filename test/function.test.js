@@ -188,6 +188,8 @@ describe('civetkern read only test', function() {
   })
   let snaps = null
   it('get file snaps success', function() {
+    snaps = instance.getFilesSnap({snap: {limit: 100, offset: 100*2}})
+    expect(snaps).to.lengthOf(willBeAdd.length)
     snaps = instance.getFilesSnap(-1)
     // console.info(snaps)
     expect(snaps).to.lengthOf(willBeAdd.length)
