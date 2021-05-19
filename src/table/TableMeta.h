@@ -6,6 +6,7 @@
 
 namespace caxios {
 
+  // this table is used to store reverse indexer for fileid query
   class TableMeta : public ITable {
   public:
     TableMeta(CDatabase* pDatabase, const std::string& name/*, const std::string& stp*/);

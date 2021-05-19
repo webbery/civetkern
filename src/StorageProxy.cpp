@@ -2,6 +2,7 @@
 #include "database.h"
 #include "json.hpp"
 #include "table/TableMeta.h"
+#include "table/TableBinaryMeta.h"
 #include <Table.h>
 #include <thread>
 #include "log.h"
@@ -215,15 +216,19 @@ namespace caxios{
   ITable* CStorageProxy::GetMetaTable(const std::string& name)
   {
     if (m_mTables.find(name) != m_mTables.end()) return m_mTables[name];
-    return nullptr;
-    // void* pData = nullptr;
-    // uint32_t len = 0;
-    // this->Get(TABLE_MATCH_META, name, pData, len);
-    // if (len == 0) return nullptr;
-    // std::vector<uint8_t> vInfo((uint8_t*)pData, (uint8_t*)pData + len);
-    // nlohmann::json info = nlohmann::json::from_cbor(vInfo);
-    // m_mTables[name] = new TableMeta(m_pCurrent, name/*, info["type"]*/);
-    // return m_mTables[name];
+    void* pData = nullptr;
+    uint32_t len = 0;
+    // TODO: upgrade in V3, remove them becasue is not binary meta
+    this->Get(TABLE_MATCH_META, name, pData, len);
+    if (len == 0) return nullptr;
+    std::vector<uint8_t> vInfo((uint8_t*)pData, (uint8_t*)pData + len);
+    nlohmann::json info = nlohmann::json::from_cbor(vInfo);
+    if (info["type"] == "bin") {
+      m_mTables[name] = new TableMeta(m_pCurrentBin, name/*, info["type"]*/);
+    } else {
+      m_mTables[name] = new TableMeta(m_pCurrent, name);
+    }
+    return m_mTables[name];
   }
 
   ITable* CStorageProxy::GetOrCreateMetaTable(const std::string& name, const std::string& type)
@@ -235,7 +240,7 @@ namespace caxios{
       auto sInfo = nlohmann::json::to_cbor(meta);
       m_pCurrent->Put(getDBI(TABLE_MATCH_META), name, sInfo.data(), sInfo.size());
       if (type == "bin") {
-        m_mTables[name] = new TableMeta(m_pCurrentBin, name/*, type*/);
+        m_mTables[name] = new TableBinaryMeta(m_pCurrentBin, name/*, type*/);
       } else {
         m_mTables[name] = new TableMeta(m_pCurrent, name/*, type*/);
       }

@@ -174,7 +174,8 @@ namespace caxios {
     if (type == "bin") {
       m_pDatabase->BeginBin();
       auto pTable = m_pDatabase->GetOrCreateMetaTable(name, type);
-      // pTable->Add()
+      std::string sBin = meta["value"];
+      pTable->Add(sBin, existFiles);
       m_pDatabase->CommitBin();
       return true;
     }
@@ -355,6 +356,11 @@ namespace caxios {
           //T_LOG("file", "file %d, get meta %s: %s", fileID, it.key().c_str(), it.value().dump().c_str());
         }
         items.emplace_back(item);
+      }
+      // binary data
+      for (auto& name: _binTables) {
+        auto pTable = m_pDatabase->GetMetaTable(name);
+        // pTable->
       }
       // tag
       Tags tags;
@@ -725,6 +731,19 @@ namespace caxios {
     return std::move(root);
   }
 
+  bool DBManager::InitBinaryTables()
+  {
+    m_pDatabase->Filter(TABLE_MATCH_META, [&](const std::string& k, void* pData, uint32_t len, void*& newVal, uint32_t& newLen)->bool {
+      std::vector<uint8_t> vInfo((uint8_t*)pData, (uint8_t*)pData + len);
+      nlohmann::json info = nlohmann::json::from_cbor(vInfo);
+      if (info["type"] == "bin") {
+        _binTables.emplace_back(k);
+      }
+      return false;
+    });
+    return true;
+  }
+
   bool DBManager::Query(const std::string& query, std::vector<FileInfo>& filesInfo)
   {
     RPN rpn(generate(query));
@@ -836,6 +855,7 @@ namespace caxios {
       ParseMeta(meta);
     }
     // open bin table
+    InitBinaryTables();
   }
 
   void DBManager::TryUpdate(const std::string& meta)

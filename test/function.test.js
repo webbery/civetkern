@@ -200,15 +200,17 @@ describe('civetkern read only test', function() {
     let filesInfo = instance.getFilesInfo([snaps[0].id])
     // console.info(filesInfo)
     expect(filesInfo).to.lengthOf(1)
-    // for (let item of filesInfo[0]['meta']) {
-    //   console.info(item)
-    //   // if (item.type === 'date') {
-    //   //   console.info(item.value.toString())
-    //   // }
-    // }
     expect(filesInfo[0]['tag']).to.exist
     expect(filesInfo[0]['tag']).to.include('test')
     expect(filesInfo[0]['tag']).to.include('标签')
+    filesInfo = instance.getFilesInfo([snaps[2].id])
+    for (let item of filesInfo[0]['meta']) {
+      console.info(item)
+      // if (item.type === 'date') {
+      //   console.info(item.value.toString())
+      // }
+    }
+    expect(filesInfo[0]['thumbnail']).to.lengthOf(3000)
   })
   it('get all tags', function() {
     const tags = instance.getAllTags()

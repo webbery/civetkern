@@ -101,6 +101,7 @@ namespace caxios {
     Snap GetFileSnap(FileID);
     WordIndex GetWordIndex(const std::string& word);
     std::unique_ptr< tpp::node > generate(const std::string& sql);
+    bool InitBinaryTables();
 
     template<typename T>
     std::vector<std::string> GetWordByIndex(const T* const wordsIndx, size_t cnt) {
@@ -141,6 +142,7 @@ namespace caxios {
     std::vector<std::vector<FileID>> GetFilesIDByTagIndex(const WordIndex* const wordsIndx, size_t cnt);
 
   private:
+    std::vector<std::string> _binTables;
     DBFlag _flag = ReadWrite;
     CStorageProxy* m_pDatabase = nullptr;
   };

@@ -142,6 +142,7 @@ namespace caxios {
     virtual bool Delete(const std::string& k, FileID fileID) = 0;
     // TODO: add custom distance function from developer
     //virtual std::vector<FileID> Query(const IExpression* expr, ) = 0;
+    // virtual std::vector<FileID> Get(const std::string& k) = 0;
     virtual Iterator begin() = 0;
     virtual Iterator end() = 0;
   protected:

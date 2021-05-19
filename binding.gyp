@@ -14,6 +14,7 @@
         "src/DBThread.cpp",
         "src/table/TableTag.cpp",
         "src/table/TableMeta.cpp",
+        "src/table/TableBinaryMeta.cpp",
         "src/table/TableClass.cpp",
         "src/RPN.cpp",
         "src/Condition.cpp",
