@@ -291,6 +291,7 @@ namespace caxios {
     return obj.Get(attr).As<Napi::Boolean>().Value();
   }
 
+
   Napi::Array AttrAsArray(Napi::Object obj, std::string attr)
   {
     return obj.Get(attr).As<Napi::Array>();
@@ -361,6 +362,15 @@ namespace caxios {
       vec.emplace_back(fid);
     });
     return std::move(vec);
+  }
+
+  std::string AttrAsBinary(Napi::Object obj, std::string attr)
+  {
+    auto bin = obj.Get(attr).As<Napi::Uint8Array>();
+    size_t len = bin.ElementLength();
+    char* ptr = reinterpret_cast<char*>(bin.ArrayBuffer().Data());
+    std::string s(ptr, len);
+    return std::move(s);
   }
 
   Napi::Array Vector2Array(Napi::Env env, const std::vector<std::string>& vStr)

@@ -24,6 +24,24 @@ namespace caxios {
   CAxios* g_pCaxios = nullptr;
   
   namespace {
+    class UInt8Finalizer {
+    public:
+      UInt8Finalizer(uint8_t* ptr, size_t len) {
+        _ptr = (uint8_t*)malloc(len);
+        memcpy(_ptr, ptr, len);
+      }
+
+      void operator()(napi_env env, void* ptr) {
+        if (ptr) {
+          free(ptr);
+        }
+      }
+
+      uint8_t* data() { return _ptr; }
+    private:
+      uint8_t* _ptr = nullptr;
+    };
+
     Napi::Object FileInfo2Object(napi_env env, const FileInfo& info) {
       Napi::Object obj = Napi::Object::New(env);
       obj.Set("id", std::get<0>(info));
@@ -33,7 +51,13 @@ namespace caxios {
       Napi::Array meta = Napi::Array::New(env, metaCnt);
       for (unsigned int idx = 0; idx < metaCnt; ++idx) {
         Napi::Object prop = Napi::Object::New(env);
-        for (auto itr = metaInfo[idx].begin(); itr != metaInfo[idx].end(); ++itr) {
+        const MetaItem& item = metaInfo[idx];
+        auto ptr = item.find("type");
+        std::string type;
+        if (ptr != item.end()) {
+          type = ptr->second;
+        }
+        for (auto itr = item.begin(); itr != item.end(); ++itr) {
           if (itr->second[0] == '^') { // datetime
             std::string num = itr->second.substr(1);
             if (isNumber(num)) {
@@ -49,6 +73,11 @@ namespace caxios {
             //T_LOG("file", "meta value: %s", itr->second.c_str());
             auto array = Parse(env, itr->second);
             prop.Set(itr->first, array);
+          }
+          else if (itr->first == "value" && type == "bin") {
+            UInt8Finalizer finalizer((uint8_t*)itr->second.data(), itr->second.size());
+            Napi::Buffer<uint8_t> arr = Napi::Buffer<uint8_t>::New(env, finalizer.data(), itr->second.size(), finalizer);
+            prop.Set(itr->first, arr);
           }
           else {
             prop.Set(itr->first, itr->second);
@@ -333,6 +362,10 @@ namespace caxios {
     if (type == "color") {
       auto colors = AttrAsStringVector(meta, "value");
       jmt["value"] = colors;
+    }
+    else if (type == "bin") {
+      auto bin = AttrAsBinary(meta, "value");
+      jmt["value"] = bin;
     }
     else {
       std::string value = AttrAsStr(meta, "value");

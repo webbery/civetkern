@@ -123,7 +123,9 @@ describe('civetkern add test', function() {
   it('add file meta', function() {
     let result = instance.addMeta({id: [fileids[0]], meta:{name: 'color', value: ['#2a344f', '#3f4865'], type: 'color', query: true}})
     expect(result).to.equal(true)
-    let jpegBin = '1qazxsw23edcvfr4'
+    let jpegBin = new Uint8Array(2)
+    jpegBin[0] = 1
+    jpegBin[1] = 2
     // console.info(jpegBin)
     result = instance.addMeta({id: [fileids[2]], meta:{name: 'thumbnail', value: jpegBin, type: 'bin'}})
     result = instance.addMeta({id: [fileids[3]], meta:{name: 'color', value: ['#2a344f', '#3f4865'], type: 'color', query: true}})
@@ -212,7 +214,8 @@ describe('civetkern read only test', function() {
       //   console.info(item.value.toString())
       // }
       if (item.name === 'thumbnail') {
-        expect(item.value).to.equal('1qazxsw23edcvfr4')
+        expect(item.value[0]).to.equal(1)
+        expect(item.value[1]).to.equal(2)
       }
     }
     // instance.query({fileid: [snaps[0].id]})

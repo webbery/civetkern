@@ -34,6 +34,7 @@ namespace caxios {
   Napi::Object FindObjectFromArray(Napi::Object obj, std::function<bool(Napi::Object)> func);
   std::vector<uint32_t> ArrayAsUint32Vector(Napi::Array arr);
   std::vector<std::string> ArrayAsStringVector(Napi::Array arr);
+  std::string AttrAsBinary(Napi::Object obj, std::string attr);
   Napi::Array Vector2Array(Napi::Env env, const std::vector<std::string>& vStr);
 
   void ForeachObject(Napi::Value value, std::function<void(const std::string&, Napi::Value)> func);
