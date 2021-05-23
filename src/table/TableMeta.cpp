@@ -37,6 +37,19 @@ namespace caxios {
     return _pDatabase->Put(_dbi, sKey, (void*)vFilesID.data(), vFilesID.size() * sizeof(FileID));
   }
 
+  bool TableMeta::Add(int32_t value, const std::vector<FileID>& fileid)
+  {
+    void* pData = nullptr;
+    uint32_t len = 0;
+    _pDatabase->Get(_dbi, value, pData, len);
+    std::vector<FileID> vFilesID;
+    if (len) {
+      vFilesID.assign((FileID*)pData, (FileID*)pData + len / sizeof(FileID));
+    }
+    addUniqueDataAndSort(vFilesID, fileid);
+    return _pDatabase->Put(_dbi, value, (void*)vFilesID.data(), vFilesID.size() * sizeof(FileID));
+  }
+
   bool TableMeta::Update(const std::string& current, const UpdateValue& value)
   {
     return true;

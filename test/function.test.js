@@ -123,11 +123,13 @@ describe('civetkern add test', function() {
   it('add file meta', function() {
     let result = instance.addMeta({id: [fileids[0]], meta:{name: 'color', value: ['#2a344f', '#3f4865'], type: 'color', query: true}})
     expect(result).to.equal(true)
-    let jpegBin = new Array(3000).join('f')
+    let jpegBin = '1qazxsw23edcvfr4'
     // console.info(jpegBin)
     result = instance.addMeta({id: [fileids[2]], meta:{name: 'thumbnail', value: jpegBin, type: 'bin'}})
     result = instance.addMeta({id: [fileids[3]], meta:{name: 'color', value: ['#2a344f', '#3f4865'], type: 'color', query: true}})
     expect(result).to.equal(true)
+    let info = instance.getFilesInfo([fileids[3]])
+    instance.addFiles(info)
   })
   it('add class', function() {
     let result = instance.addClasses(['新分类', 'class2', '新分类/新分类'])
@@ -203,14 +205,17 @@ describe('civetkern read only test', function() {
     expect(filesInfo[0]['tag']).to.exist
     expect(filesInfo[0]['tag']).to.include('test')
     expect(filesInfo[0]['tag']).to.include('标签')
-    filesInfo = instance.getFilesInfo([snaps[2].id])
+    filesInfo = instance.getFilesInfo([snaps[1].id])
     for (let item of filesInfo[0]['meta']) {
-      console.info(item)
+      // console.info(item)
       // if (item.type === 'date') {
       //   console.info(item.value.toString())
       // }
+      if (item.name === 'thumbnail') {
+        expect(item.value).to.equal('1qazxsw23edcvfr4')
+      }
     }
-    expect(filesInfo[0]['thumbnail']).to.lengthOf(3000)
+    // instance.query({fileid: [snaps[0].id]})
   })
   it('get all tags', function() {
     const tags = instance.getAllTags()
@@ -276,7 +281,7 @@ describe('civetkern read only test', function() {
     result = instance.query({datetime: {$gt: day}})
     expect(result).to.lengthOf(1)
     day.setMonth(10, 20)
-    // console.info(day.getTime())
+    //console.info(day.getTime())
     result = instance.query({datetime: {$gt: day}})
     expect(result).to.lengthOf(0)
     result = instance.query({datetime: '*'})

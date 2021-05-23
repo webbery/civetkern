@@ -72,14 +72,12 @@ namespace caxios {
     return tid;
 #endif
   }
-  FILE* test;
 
   class FLog {
   public:
     FLog(){
     }
     ~FLog(){
-    fclose(test);
       fclose(_file);
     }
 
@@ -87,7 +85,6 @@ namespace caxios {
       std::string logname(fname);
       std::string mode("");
       if (flag == 0) mode = "write";
-    test = fopen("1111", "a+");
       int idx = 1;
       std::string filename;
       while (true) {
@@ -117,8 +114,8 @@ namespace caxios {
       }
       root += "/";
 #endif
-fputs((root + filename+"\n").c_str(), test);
-      fflush(test);
+//fputs((root + filename+"\n").c_str(), test);
+//      fflush(test);
       _file = fopen((root + filename).c_str(), "a+");
       if (_file) return true;
       return false;

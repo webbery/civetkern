@@ -59,6 +59,7 @@ namespace caxios {
     void InitMap();
     void TryUpdate(const std::string& meta);
     bool AddFile(FileID, const MetaItems&, const Keywords&);
+    void AddMetaImpl(const std::vector<FileID>& files, const nlohmann::json& meta);
     //bool AddBinMeta(FileID, )
     bool AddFileID2Tag(const std::vector<FileID>&, WordIndex);
     bool AddFileID2Keyword(FileID, WordIndex);
@@ -102,6 +103,7 @@ namespace caxios {
     WordIndex GetWordIndex(const std::string& word);
     std::unique_ptr< tpp::node > generate(const std::string& sql);
     bool InitBinaryTables();
+    bool CanBeQuery(const nlohmann::json& meta);
 
     template<typename T>
     std::vector<std::string> GetWordByIndex(const T* const wordsIndx, size_t cnt) {

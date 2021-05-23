@@ -138,6 +138,7 @@ namespace caxios {
     virtual ~ITable() {}
 
     virtual bool Add(const std::string& value, const std::vector<FileID>& fileid) = 0;
+    virtual bool Add(int32_t value, const std::vector<FileID>& fileid) { return false; }
     virtual bool Update(const std::string& current, const UpdateValue& value) = 0;
     virtual bool Delete(const std::string& k, FileID fileID) = 0;
     // TODO: add custom distance function from developer
@@ -145,6 +146,8 @@ namespace caxios {
     // virtual std::vector<FileID> Get(const std::string& k) = 0;
     virtual Iterator begin() = 0;
     virtual Iterator end() = 0;
+
+    virtual bool Get(uint32_t key, std::string& val) { return false; }
   protected:
     CDatabase* _pDatabase = nullptr;
   };

@@ -12,8 +12,8 @@ namespace caxios{
 
 
   enum DATABASE_OPERATOR {
-    NORMAL = 0,     // δ����״̬
-    TRANSACTION,    // ������д��, ���ύ
+    NORMAL = 0,     // 未操作状态
+    TRANSACTION,    // 有数据写入, 待提交
   };
 
   // put flag of civetkern

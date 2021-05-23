@@ -171,35 +171,18 @@ namespace caxios {
     if (existFiles.size() == 0) return false;
     std::string name = meta["name"];
     std::string type = meta["type"];
+    //T_LOG("file", "add meta type: %s, files: %s", type.c_str(), format_vector(existFiles).c_str());
     if (type == "bin") {
       m_pDatabase->BeginBin();
       auto pTable = m_pDatabase->GetOrCreateMetaTable(name, type);
       std::string sBin = meta["value"];
+      T_LOG("file", "add bin data, len: %d", sBin.size());
       pTable->Add(sBin, existFiles);
       m_pDatabase->CommitBin();
       return true;
     }
     WRITE_BEGIN();
-    // add meta to file
-    void* pData = nullptr;
-    uint32_t len = 0;
-    for (FileID fid : existFiles) {
-      m_pDatabase->Get(TABLE_FILE_META, fid, pData, len);
-      std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
-      nlohmann::json fileMeta = nlohmann::json::from_cbor(info);
-      fileMeta.push_back(meta);
-      //T_LOG("file", "add new meta, result: %s", fileMeta.dump().c_str());
-      auto vData = nlohmann::json::to_cbor(fileMeta);
-      m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
-    }
-    // add to meta table
-    if (meta["query"] == true && type != "bin") {
-      auto pTable = m_pDatabase->GetOrCreateMetaTable(name, meta["type"]);
-      std::vector<std::string> vStr = meta["value"];
-      for (auto& val : vStr) {
-        pTable->Add(val, existFiles);
-      }
-    }
+    this->AddMetaImpl(existFiles, meta);
     WRITE_END();
     return true;
   }
@@ -360,7 +343,15 @@ namespace caxios {
       // binary data
       for (auto& name: _binTables) {
         auto pTable = m_pDatabase->GetMetaTable(name);
-        // pTable->
+        T_LOG("files", "binary table name: %s, ptr: %x", name.c_str(), pTable);
+        std::string bin;
+        if (pTable->Get(fileID, bin)) {
+          MetaItem item;
+          item["name"] = name;
+          item["type"] = "bin";
+          item["value"] = bin;
+          items.emplace_back(item);
+        }
       }
       // tag
       Tags tags;
@@ -744,6 +735,17 @@ namespace caxios {
     return true;
   }
 
+  bool DBManager::CanBeQuery(const nlohmann::json& meta)
+  {
+    std::string name = meta["name"];
+    if (m_pDatabase->GetMetaTable(name)) return true;
+    std::string type = meta["type"];
+    if (meta.contains("query") && meta["query"] == true && type != "bin") {
+      return true;
+    }
+    return false;
+  }
+
   bool DBManager::Query(const std::string& query, std::vector<FileInfo>& filesInfo)
   {
     RPN rpn(generate(query));
@@ -896,18 +898,56 @@ namespace caxios {
     // T_LOG("file", "Write Snap: %s", sSnaps.c_str());
     // meta
     for (MetaItem m : meta) {
-      std::string& name = m["name"];
-      auto pTable = m_pDatabase->GetMetaTable(name);
-      if (!pTable) continue;
-      // std::vector<FileID> vID;
-      // vID.emplace_back(fileid);
+      nlohmann::json val = m;
+      T_LOG("file", "add meta %s", val.dump().c_str());
+      this->AddMetaImpl({ fileid }, m);
+      //std::string& name = m["name"];
+      //auto pTable = m_pDatabase->GetMetaTable(name);
+      //if (!pTable) continue;
       // T_LOG("file", "add meta(%s): %s, %d", name.c_str(), m["value"].c_str(), fileid);
-      pTable->Add(m["value"], { fileid });
+      //pTable->Add(m["value"], { fileid });
     }
     // counts
     SetSnapStep(fileid, BIT_INIT_OFFSET);
     // keyword
     return true;
+  }
+
+  void DBManager::AddMetaImpl(const std::vector<FileID>& files, const nlohmann::json& meta)
+  {
+    std::string name = meta["name"];
+    std::string type = meta["type"];
+    bool isQuery = CanBeQuery(meta);
+    std::vector<std::string> vStr;
+    if (isQuery) {
+      if (meta["value"].is_array()) {
+        std::vector<std::string> vTmp = meta["value"];
+        vStr = vTmp;
+      }
+      else {
+        std::string vTmp = meta["value"];
+        vStr.emplace_back(vTmp);
+      }
+    }
+    // add meta to file
+    void* pData = nullptr;
+    uint32_t len = 0;
+    for (FileID fid : files) {
+      m_pDatabase->Get(TABLE_FILE_META, fid, pData, len);
+      std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
+      nlohmann::json fileMeta = nlohmann::json::from_cbor(info);
+      fileMeta.push_back(meta);
+      //T_LOG("file", "add new meta, result: %s", fileMeta.dump().c_str());
+      auto vData = nlohmann::json::to_cbor(fileMeta);
+      m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
+    }
+    // add to meta table
+    if (isQuery) {
+      auto pTable = m_pDatabase->GetOrCreateMetaTable(name, type);
+      for (auto& val : vStr) {
+        pTable->Add(val, files);
+      }
+    }
   }
 
   bool DBManager::AddFileID2Tag(const std::vector<FileID>& vFilesID, WordIndex index)

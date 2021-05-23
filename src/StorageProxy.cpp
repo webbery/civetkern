@@ -224,7 +224,7 @@ namespace caxios{
     std::vector<uint8_t> vInfo((uint8_t*)pData, (uint8_t*)pData + len);
     nlohmann::json info = nlohmann::json::from_cbor(vInfo);
     if (info["type"] == "bin") {
-      m_mTables[name] = new TableMeta(m_pCurrentBin, name/*, info["type"]*/);
+      m_mTables[name] = new TableBinaryMeta(m_pCurrentBin, name/*, info["type"]*/);
     } else {
       m_mTables[name] = new TableMeta(m_pCurrent, name);
     }

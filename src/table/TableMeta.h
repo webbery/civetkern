@@ -13,6 +13,7 @@ namespace caxios {
     virtual ~TableMeta();
 
     virtual bool Add(const std::string& value, const std::vector<FileID>& fileid);
+    virtual bool Add(int32_t value, const std::vector<FileID>& fileid);
     virtual bool Update(const std::string& current, const UpdateValue& value);
     virtual bool Delete(const std::string& k, FileID fileID);
     virtual std::vector<FileID> Find(const std::string& k);

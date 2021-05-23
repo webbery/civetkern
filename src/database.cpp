@@ -57,6 +57,7 @@ namespace caxios {
     }
   }
   CDatabase::~CDatabase() {
+
     if (m_pDBEnv) {
       mdb_env_close(m_pDBEnv);
       m_pDBEnv = nullptr;
