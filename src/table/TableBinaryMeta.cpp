@@ -23,6 +23,7 @@ namespace caxios {
     }
 
     bool TableBinaryMeta::Delete(const std::string& k, FileID fileID){
+      T_LOG("bindb", "delete %d", fileID);
       return _pDatabase->Del(_dbi, fileID);
     }
 

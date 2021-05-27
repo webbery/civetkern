@@ -904,7 +904,7 @@ namespace caxios {
     }
     //for (MetaItem m : meta) {
       nlohmann::json val = cleanMeta;
-      T_LOG("file", "add meta %s", val.dump().c_str());
+      //T_LOG("file", "add meta %s", val.dump().c_str());
       this->AddMetaImpl({ fileid }, cleanMeta);
       //std::string& name = m["name"];
       //auto pTable = m_pDatabase->GetMetaTable(name);
@@ -931,12 +931,27 @@ namespace caxios {
         m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
         continue;
       }
-      std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
-      nlohmann::json fileMeta = nlohmann::json::from_cbor(info);
-      fileMeta.push_back(meta);
-      T_LOG("file", "add new meta, result: %s", fileMeta.dump().c_str());
-      auto vData = nlohmann::json::to_cbor(fileMeta);
-      m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
+      else {
+        std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
+        nlohmann::json fileMeta = nlohmann::json::from_cbor(info);
+        if (meta.is_array()) {
+          for (auto& item : meta) {
+            for (auto& origMeta : fileMeta) {
+              if (origMeta["name"] == item["name"]) {
+                origMeta["value"] = item["value"];
+                break;
+              }
+            }
+          }
+        }
+        else
+        {
+          fileMeta.push_back(meta);
+          //T_LOG("file", "add new meta, result: %s", fileMeta.dump().c_str());
+        }
+        auto vData = nlohmann::json::to_cbor(fileMeta);
+        m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
+      }
     }
     // add to meta table
     auto pushTable = [this](const std::vector<FileID>& files, const nlohmann::json& meta) {
@@ -962,6 +977,7 @@ namespace caxios {
       }
     };
     if (meta.is_array()) {
+      //T_LOG("file", "add meta of array: %s", meta.dump().c_str());
       for (auto& item: meta)
       {
         pushTable(files, item);
@@ -1221,7 +1237,7 @@ namespace caxios {
       T_LOG("file", "meta size: %d", len);
       std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
       json meta = json::from_cbor(info);
-      //T_LOG("file", "file meta(%d): %s", len, meta.dump().c_str());
+      T_LOG("file", "file meta(%d): %s", len, meta.dump().c_str());
       // meta
       for (json::iterator itr = meta.begin(); itr != meta.end(); ++itr) {
         std::string name = (*itr)["name"];
@@ -1255,11 +1271,15 @@ namespace caxios {
   {
     void* pData = nullptr;
     uint32_t len = 0;
+    T_LOG("file", "remove file 0");
     m_pDatabase->Get(file2type, fileID, pData, len);
+    //if (len == 0) return;
+    T_LOG("file", "remove file 1");
     std::vector<WordIndex> vTypesID((WordIndex*)pData, (WordIndex*)pData + len / sizeof(WordIndex));
     for (auto typeID : vTypesID)
     {
       m_pDatabase->Get(type2file, typeID, pData, len);
+      T_LOG("file", "remove file type: %d", typeID);
       std::vector<FileID> vFiles((FileID*)pData, (FileID*)pData + len / sizeof(FileID));
       eraseData(vFiles, fileID);
       m_pDatabase->Put(type2file, typeID, vFiles.data(), vFiles.size() * sizeof(FileID));
