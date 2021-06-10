@@ -16,6 +16,7 @@
         "src/table/TableMeta.cpp",
         "src/table/TableBinaryMeta.cpp",
         "src/table/TableClass.cpp",
+        "src/table/TableIndex.cpp",
         "src/RPN.cpp",
         "src/Condition.cpp",
         "src/Table.cpp",

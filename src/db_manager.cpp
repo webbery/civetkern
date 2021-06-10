@@ -898,8 +898,23 @@ namespace caxios {
     // T_LOG("file", "Write Snap: %s", sSnaps.c_str());
     // meta
     MetaItems cleanMeta;
+    std::set<std::string> keyname;
+    auto updateMeta = [](MetaItems& meta, MetaItem& item) {
+      for (auto ptr = meta.begin(); ptr != meta.end(); ++ptr)
+      {
+        if ((*ptr)["name"] == item["name"]) {
+          (*ptr)["value"] = item["value"];
+          break;
+        }
+      }
+    };
     for (auto item : meta) {
-      if (item["value"].empty()) continue;
+      if (item["value"].empty() || item["type"] == "undefined") continue;
+      auto itr = keyname.find(item["name"]);
+      if (itr != keyname.end()) {
+        updateMeta(cleanMeta, item);
+        continue;
+      }
       cleanMeta.emplace_back(item);
     }
     //for (MetaItem m : meta) {

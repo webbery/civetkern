@@ -644,6 +644,18 @@ namespace caxios {
     return Napi::Value();
   }
 
+  Napi::Value insert(const Napi::CallbackInfo& info) {
+    return Napi::Value();
+  }
+
+  Napi::Value update(const Napi::CallbackInfo& info) {
+    return Napi::Value();
+  }
+
+  Napi::Value drop(const Napi::CallbackInfo& info) {
+    return Napi::Value();
+  }
+
   Napi::Value writeLog(const Napi::CallbackInfo& info) {
     if (!info[0].IsUndefined()) {
       std::string str = info[0].As<Napi::String>();
@@ -682,6 +694,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   EXPORT_JS_FUNCTION_PARAM(removeTags);
   EXPORT_JS_FUNCTION_PARAM(removeClasses);
   EXPORT_JS_FUNCTION_PARAM(query);
+  EXPORT_JS_FUNCTION_PARAM(insert);
+  EXPORT_JS_FUNCTION_PARAM(update);
+  EXPORT_JS_FUNCTION_PARAM(drop);
   EXPORT_JS_FUNCTION_PARAM(debug);
   EXPORT_JS_FUNCTION_PARAM(writeLog);
   return exports;
