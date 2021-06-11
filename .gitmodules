@@ -1,0 +1,3 @@
+[submodule "src/GQLlite"]
+	path = src/GQLlite
+	url = https://github.com/webbery/GQLlite.git

@@ -25,6 +25,7 @@
     "devDependencies": {
         "@vue/cli": "^4.5.11",
         "chai": "^4.2.0",
-        "mocha": "^8.2.1"
+        "mocha": "^8.2.1",
+        "node-gyp": "^8.1.0"
     }
 }
