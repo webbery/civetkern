@@ -187,7 +187,7 @@ namespace caxios {
       enableLog = info[2].As<Napi::Boolean>();
     }
     init_log(readOnly, enableLog);
-    std::string defaultName = AttrAsStr(options, "/app/default");
+    std::string defaultName = AttrAsStr(options, "/app/default/dbname");
     // T_LOG("init", "default: %s, config: %s", defaultName.c_str(), Stringify(info.Env(), options).c_str());
     Napi::Object resource = FindObjectFromArray(options.Get("resources").As<Napi::Object>(), [&defaultName](Napi::Object obj)->bool {
       if (AttrAsStr(obj, "name") == defaultName) return true;
