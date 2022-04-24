@@ -873,8 +873,8 @@ namespace caxios {
     using namespace nlohmann;
     //json dbMeta;
     //dbMeta = meta;
-    // std::string value = to_string(dbMeta);
-    // T_LOG("file", "Write ID: %d, Meta Info: %s", fileid, value.c_str());
+    //std::string value = to_string(dbMeta);
+    //T_LOG("file", "Write ID: %d, Meta Info: %s", fileid, value.c_str());
     //auto vData = json::to_cbor(dbMeta);
     //if (!m_pDatabase->Put(TABLE_FILE_META, fileid, (void*)(&vData[0]), vData.size())) {
     //  return false;
@@ -918,7 +918,7 @@ namespace caxios {
       cleanMeta.emplace_back(item);
     }
     //for (MetaItem m : meta) {
-      nlohmann::json val = cleanMeta;
+      //nlohmann::json val = cleanMeta;
       //T_LOG("file", "add meta %s", val.dump().c_str());
       this->AddMetaImpl({ fileid }, cleanMeta);
       //std::string& name = m["name"];
@@ -944,26 +944,34 @@ namespace caxios {
         // array
         auto vData = nlohmann::json::to_cbor(meta);
         m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
+        //T_LOG("file", "add new resource, result[%d]: %s", fid, meta.dump().c_str());
         continue;
       }
       else {
         std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
         nlohmann::json fileMeta = nlohmann::json::from_cbor(info);
         if (meta.is_array()) {
-          for (auto& item : meta) {
+          auto upset = [&fileMeta](const std::string& key, const nlohmann::json& value) -> bool {
             for (auto& origMeta : fileMeta) {
-              if (origMeta["name"] == item["name"]) {
-                origMeta["value"] = item["value"];
-                break;
+              if (origMeta["name"] == key) {
+                origMeta["value"] = value;
+                return true;
               }
+            }
+            return false;
+          };
+          for (auto& item : meta) {
+            if (!upset(item["name"], item["value"])) {
+              fileMeta.push_back(item);
             }
           }
         }
         else
         {
           fileMeta.push_back(meta);
-          //T_LOG("file", "add new meta, result: %s", fileMeta.dump().c_str());
+          //T_LOG("file", "add new meta, result: %s", meta.dump().c_str());
         }
+        //T_LOG("file", "add new meta, finally: %s", fileMeta.dump().c_str());
         auto vData = nlohmann::json::to_cbor(fileMeta);
         m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
       }
@@ -1556,7 +1564,7 @@ namespace caxios {
       T_LOG("class", "%s children count: %d", clazz.c_str(), cnt);
       vChildren.assign((ClassID*)pData + CHILD_START_OFFSET, (ClassID*)pData + cnt);
     }
-    T_LOG("class", "%s children: %s", clazz.c_str(), format_vector(vChildren).c_str());
+    T_LOG("class", "%s[%d] children: %s", clazz.c_str(), cnt, format_vector(vChildren).c_str());
     return std::move(vChildren);
   }
 
