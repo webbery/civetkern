@@ -448,6 +448,18 @@ namespace caxios {
     return std::move(vStr);
   }
 
+  bool isInteger(Napi::Env& env, Napi::Value& num)
+  {
+    return env.Global()
+      .Get("Number")
+      .ToObject()
+      .Get("isInteger")
+      .As<Napi::Function>()
+      .Call({ num })
+      .ToBoolean()
+      .Value();
+  }
+
   bool isNumber(const std::string& input)
   {
     std::regex reg("[0-9]+.[0-9]*");

@@ -1,6 +1,6 @@
 {
     "name": "civetkern",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "description": "civet database",
     "scripts": {
         "install": "prebuild-install || node-gyp rebuild",

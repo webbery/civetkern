@@ -250,18 +250,24 @@ namespace caxios {
         Napi::Array array = AttrAsArray(v.As<Napi::Object>(), "meta");
         //std::string sArr = Stringify(env, array);
         //T_LOG("file", "process meta: %s", sArr.c_str());
-        ForeachArray(array, [&metaItems](Napi::Value item) {
+        ForeachArray(array, [&env, &metaItems](Napi::Value item) {
           if (item.IsObject()) {
             MetaItem meta;
-            ForeachObject(item, [&meta](const std::string& k, Napi::Value v) {
+            ForeachObject(item, [&env, &meta](const std::string& k, Napi::Value v) {
               auto obj = v.As<Napi::Object>().Get(k);
               std::string sVal;
               if (obj.IsString()) {
                 sVal = obj.As<Napi::String>();
               }
               else if (obj.IsNumber()) {
-                auto num = obj.As<Napi::Number>().Uint32Value();
-                sVal = std::to_string(num);
+                if (isInteger(env, obj)) {
+                  auto num = obj.As<Napi::Number>().Uint32Value();
+                  sVal = std::to_string(num);
+                }
+                else {
+                  auto num = obj.As<Napi::Number>().DoubleValue();
+                  sVal = std::to_string(num);
+                }
               }
 #if NAPI_VERSION >= 5
               else if( obj.IsDate()) {

@@ -8,6 +8,8 @@
 #define CAXIOS_MAJOR_VERSION  1
 #define CAXIOS_MINOR_VERSION  0
 
+#define NUMARGS(...)  (sizeof((int[]){__VA_ARGS__})/sizeof(int))
+
 #if defined(__linux__) || defined(__APPLE__)
 #define sprintf_s snprintf
 #endif
@@ -25,18 +27,6 @@
 #else
 #include <string.h>
 #define T_LOG(module, fmt, ...)  {\
-    char* clg = new char[1024];\
-    memset(clg, 0, 1024);\
-    sprintf_s(clg, 1024, "[%s] [%u] [%s] [%s] [%s:%d] " fmt "\n", \
-      caxios::current().c_str(),\
-      caxios::threadid(),\
-      module,\
-      __FUNCTION__,\
-      caxios::get_file_name(__FILE__).c_str(), \
-      __LINE__, \
-      ##__VA_ARGS__); \
-    log2file(clg);\
-    delete[] clg;\
   }
 #endif
 

@@ -46,6 +46,7 @@ namespace caxios {
 
   std::string trunc(const std::string& elm);
   std::vector<std::string> split(const std::string& str, char delim);
+  bool isInteger(Napi::Env& env, Napi::Value& num);
   bool isNumber(const std::string&);
   bool isHex(const std::string&);
 

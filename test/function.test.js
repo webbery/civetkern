@@ -5,7 +5,13 @@ const instance = require('../build/Release/civetkern')
 let cfg = {
   app: {
       first: true,
-      default: '图像库'
+      default: {
+        dbname: '图像库',
+        layout: 'map view'
+      },
+      shortcut: {
+        key: {command: 'command', extension: 'extension', description: 'desc'},
+      }
   },
   resources:[
       {
