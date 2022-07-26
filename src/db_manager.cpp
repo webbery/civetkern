@@ -341,6 +341,9 @@ namespace caxios {
         items.emplace_back(item);
       }
       // binary data
+      if (_binTables.size() == 0) {
+        InitBinaryTables();
+      }
       for (auto& name: _binTables) {
         auto pTable = m_pDatabase->GetMetaTable(name);
         T_LOG("files", "binary table name: %s, ptr: %x", name.c_str(), pTable);
@@ -944,7 +947,7 @@ namespace caxios {
         // array
         auto vData = nlohmann::json::to_cbor(meta);
         m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
-        //T_LOG("file", "add new resource, result[%d]: %s", fid, meta.dump().c_str());
+        T_LOG("file", "add new resource, result[%d]: %s", fid, meta.dump().c_str());
         continue;
       }
       else {
