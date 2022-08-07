@@ -27,6 +27,7 @@
       "include_dirs": [
         "include",
         "src",
+        "gqlite/include",
         # "<!(node -e \"require('nan')\")",
 		    '<!@(node -p "require(\'node-addon-api\').include")',
       ],
@@ -44,6 +45,7 @@
         '-std=gnu++1y',
         '-std=gnu++0x'
       ],
+      
       'xcode_settings': {
         'CLANG_CXX_LANGUAGE_STANDARD': 'c++17',
         'MACOSX_DEPLOYMENT_TARGET': '10.9',
@@ -64,8 +66,23 @@
 	            'msvs_settings': {
                 'VCCLCompilerTool': {
                   "ExceptionHandling": 1,
-                  'AdditionalOptions': [ '-std:c++17' ],
+                  'AdditionalOptions': [ '-std:c++17'],
+                  'WholeProgramOptimization': 'true',
                   'RuntimeTypeInfo': 'true'
+                },
+                'VCLibrarianTool': {
+                  'AdditionalOptions': [
+                    '/LTCG:INCREMENTAL'
+                  ]
+                },
+                'VCLinkerTool': {
+                  'ImageHasSafeExceptionHandlers': 'false',
+                  'OptimizeReferences': 2,
+                  'EnableCOMDATFolding': 2,
+                  'LinkIncremental': 1,
+                  'AdditionalOptions': [
+                    '/LTCG:INCREMENTAL'
+                  ]
                 }
               }
             },
@@ -78,11 +95,39 @@
                 }
               }
             }
-          }
+          },
+          "libraries": [
+            "<!(echo %cd%)/gqlite/build/Release/gqlite.lib"
+          ]
         }],
         ['OS=="linux"', {
+          "link_settings": {
+            'library_dirs': ['<!(pwd)/gqlite/build'],
+            'libraries': [
+              '-lgqlite'
+            ],
+            'ldflags': [
+              # Ensure runtime linking is relative to sharp.node
+              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
+            ]
+          }
+        }],
+        ['OS=="mac"', {
+          "link_settings": {
+            'library_dirs': ['<!(pwd)/gqlite/build'],
+            'libraries': [
+              'libgqlite.dylib'
+            ],
+            'ldflags': [
+              # Ensure runtime linking is relative to sharp.node
+              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
+            ]
+          }
         }]
       ]
     }
-  ]
+  ],
+  "scripts": {
+    # "prebuild": ["<!(node ./prebuild.js)"]
+  }
 }
