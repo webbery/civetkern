@@ -2,26 +2,33 @@
     "name": "civetkern",
     "version": "0.3.6",
     "description": "civet database",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/webbery/civetkern.git"
+    },
     "scripts": {
-        "install": "prebuild-install || node-gyp rebuild",
+        "install": "npm install -g prebuild || prebuild-install || node-gyp rebuild",
         "rebuild": "node-gyp rebuild --verbose",
-        "prebuild": "npm run gqlite && prebuild --all --strip",
+        "prebuild": "npm run gqlite && prebuild --runtime --all --strip",
         "build": "node-gyp configure && node-gyp build",
         "test": "node_modules/.bin/mocha test/function.test.js",
         "test:performance": "node_modules/.bin/mocha --timeout 15000 test/performance.test.js",
-        "gqlite": "git clone --recursive https://github.com/webbery/gqlite.git gqlite && cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release"
+        "gqlite": "git clone --recursive https://github.com/webbery/gqlite.git gqlite && cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release",
+        "upload": "prebuild --runtime --upload ${GITHUB_TOKEN}"
     },
     "keywords": [
         "nodejs",
         "c++",
         "civet",
-        "addon"
+        "addon",
+        "gqlite"
     ],
     "gypfile": true,
     "author": "webberg",
     "license": "MIT",
     "dependencies": {
-        "node-addon-api": "^3.0.2"
+        "node-addon-api": "^3.0.2",
+        "prebuild-install": "^7.1.1"
     },
     "devDependencies": {
         "@vue/cli": "^4.5.11",
