@@ -86,6 +86,6 @@
     }
   ],
   "scripts": {
-    "prebuild": ["<!(node ./prebuild.js)"]
+    # "prebuild": ["<!(node ./prebuild.js)"]
   }
 }
