@@ -8,6 +8,7 @@
 #include <locale.h>
 #include "json.hpp"
 #include "log.h"
+#include "gqlite.h"
 #if defined(__APPLE__) || defined(__gnu_linux__) || defined(__linux__) 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -175,6 +176,8 @@ namespace caxios {
   }
   Napi::Value init(const Napi::CallbackInfo& info) {
     if (g_pCaxios) return Napi::Value::From(info.Env(), true);
+    gqlite* g_handle = nullptr;
+    gqlite_open(&g_handle, nullptr);
     init_trace();
     //setlocale(LC_ALL, "");
     Napi::Object options = info[0].As<Napi::Object>();
