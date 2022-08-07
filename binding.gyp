@@ -84,5 +84,8 @@
         }]
       ]
     }
-  ]
+  ],
+  "scripts": {
+    "prebuild": ["<!(node ./prebuild.js)"]
+  }
 }
