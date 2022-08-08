@@ -7,13 +7,13 @@
         "url": "https://github.com/webbery/civetkern.git"
     },
     "scripts": {
-        "install": "npm install -g prebuild || prebuild-install || node-gyp rebuild",
+        "install": "npm install -g prebuild && npm run gqlite && (prebuild-install || node-gyp rebuild)",
         "rebuild": "node-gyp rebuild --verbose",
         "prebuild": "npm run gqlite && prebuild --runtime --all --strip",
         "build": "node-gyp configure && node-gyp build",
         "test": "node_modules/.bin/mocha test/function.test.js",
         "test:performance": "node_modules/.bin/mocha --timeout 15000 test/performance.test.js",
-        "gqlite": "git clone --recursive https://github.com/webbery/gqlite.git gqlite && cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release",
+        "gqlite": "((cd gqlite && git pull) || (git clone --recursive https://github.com/webbery/gqlite.git gqlite && cd gqlite)) && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release",
         "upload": "prebuild --runtime --upload ${GITHUB_TOKEN}"
     },
     "keywords": [
