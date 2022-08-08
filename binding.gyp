@@ -27,6 +27,7 @@
       "include_dirs": [
         "include",
         "src",
+        "gqlite/include",
         # "<!(node -e \"require('nan')\")",
 		    '<!@(node -p "require(\'node-addon-api\').include")',
       ],
@@ -44,6 +45,7 @@
         '-std=gnu++1y',
         '-std=gnu++0x'
       ],
+      
       'xcode_settings': {
         'CLANG_CXX_LANGUAGE_STANDARD': 'c++17',
         'MACOSX_DEPLOYMENT_TARGET': '10.9',
@@ -55,6 +57,9 @@
           '-mmacosx-version-min=10.15',
           '-Wno-pessimizing-move'
           '-O3'
+        ],
+        "libraries": [
+          "-L<!(pwd)/gqlite/build/libgqlite.a"
         ]
       },
       'conditions':[
@@ -78,9 +83,15 @@
                 }
               }
             }
-          }
+          },
+          "libraries": [
+            "<!(pwd)/gqlite/build/Release/gqlite.lib"
+          ]
         }],
         ['OS=="linux"', {
+          "libraries": [
+            "-L<!(pwd)/gqlite/build/libgqlite.a"
+          ]
         }]
       ]
     }
