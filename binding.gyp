@@ -59,7 +59,7 @@
           '-O3'
         ],
         "libraries": [
-          "-L<!(pwd)/gqlite/build/libgqlite.a"
+          "-L<!(pwd)/gqlite/build/Release/libgqlite.a"
         ]
       },
       'conditions':[
@@ -90,7 +90,7 @@
         }],
         ['OS=="linux"', {
           "libraries": [
-            "-L<!(pwd)/gqlite/build/libgqlite.a"
+            "-L<!(pwd)/gqlite/build/Release/libgqlite.a"
           ]
         }]
       ]
