@@ -12,7 +12,11 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
         with:
-          node-version: 14
+          node-version: 16
+      - name: install dependency
+        run: |
+          brew install bison
+          echo "$(brew --prefix bison)/bin" >> $GITHUB_PATH
       - name: build
         run: |
           npm install -g prebuild
