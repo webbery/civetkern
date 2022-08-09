@@ -85,7 +85,7 @@
             }
           },
           "libraries": [
-            "<!(pwd)/gqlite/build/Release/gqlite.lib"
+            "<!(echo %cd%)/gqlite/build/Release/gqlite.lib"
           ]
         }],
         ['OS=="linux"', {
