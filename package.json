@@ -13,7 +13,7 @@
         "build": "node-gyp configure && node-gyp build",
         "test": "node_modules/.bin/mocha test/function.test.js",
         "test:performance": "node_modules/.bin/mocha --timeout 15000 test/performance.test.js",
-        "gqlite": "(cd gqlite || git clone --recursive https://github.com/webbery/gqlite.git gqlite) && cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release -DGQLITE_BUILD_SHARED=TRUE gqlite&& cmake --build gqlite/build --config Release",
+        "gqlite": "(cd gqlite || git clone --recursive https://github.com/webbery/gqlite.git gqlite) && cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release -DGQLITE_BUILD_SHARED=TRUE -DGQLITE_BUILD_TEST=FALSE gqlite&& cmake --build gqlite/build --config Release",
         "upload": "prebuild --runtime --upload ${GITHUB_TOKEN}"
     },
     "keywords": [
