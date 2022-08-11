@@ -11,13 +11,15 @@ let fs = require('fs')
 let os = require('os')
 if (os.platform() === "win32") {
   if (fs.existsSync('gqlite')) {
-    runCommand('cmake -B build -DCMAKE_BUILD_TYPE=Release -DGQLITE_BUILD_SHARED=TRUE -DGQLITE_BUILD_TEST=FALSE gqlite', 'gqlite')
+  } else {
+    runCommand('git clone --recursive https://github.com/webbery/gqlite.git gqlite', '.')
+  }
+  runCommand('cmake -B build -DCMAKE_BUILD_TYPE=Release -DGQLITE_BUILD_SHARED=TRUE -DGQLITE_BUILD_TEST=FALSE gqlite', 'gqlite')
     runCommand('cmake --build build --config Release', 'gqlite')
-  }
-  
 } else {
-  if (fs.existsSync('gqlite')) {
-    runCommand('cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release -DGQLITE_BUILD_SHARED=TRUE -DGQLITE_BUILD_TEST=FALSE gqlite', '.')
-    runCommand('cmake --build gqlite/build --config Release', '.')
+  if (!fs.existsSync('gqlite')) {
+    runCommand('git clone --recursive https://github.com/webbery/gqlite.git gqlite', '.')
   }
+  runCommand('cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release -DGQLITE_BUILD_SHARED=TRUE -DGQLITE_BUILD_TEST=FALSE gqlite', '.')
+    runCommand('cmake --build gqlite/build --config Release', '.')
 }
