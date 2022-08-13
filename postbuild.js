@@ -10,8 +10,8 @@ if (os.platform() === "win32") {
   runCommand('cp gqlite/build/Release/gqlite.dll build/Release/', '.')
 }
 else if (os.platform() === "linux") {
-  runCommand('cp gqlite/build/Release/libgqlite.so build/Release/', '.')
+  runCommand('cp gqlite/build/libgqlite.so build/Release/', '.')
 }
 else if (os.platform() === "darwin") {
-  runCommand('cp gqlite/build/Release/gqlite.dyld build/Release/', '.')
+  runCommand('cp gqlite/build/libgqlite.dyld build/Release/', '.')
 }
