@@ -7,10 +7,10 @@
         "url": "https://github.com/webbery/civetkern.git"
     },
     "scripts": {
-        "install": "npm install -g prebuild && node prebuild.js && (prebuild-install || node-gyp rebuild)",
+        "install": "npm install prebuild && node prebuild.js && (prebuild-install || node-gyp rebuild) && node postbuild.js",
         "rebuild": "node-gyp rebuild --verbose",
         "prebuild": "node prebuild.js && prebuild --runtime --all --strip",
-        "build": "node-gyp configure && node-gyp build",
+        "build": "node-gyp configure && node-gyp build && node postbuild.js",
         "test": "node_modules/.bin/mocha test/function.test.js",
         "test:performance": "node_modules/.bin/mocha --timeout 15000 test/performance.test.js",
         "upload": "prebuild --runtime --upload ${GITHUB_TOKEN}"
