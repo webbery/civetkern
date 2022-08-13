@@ -45,7 +45,6 @@
         '-std=gnu++1y',
         '-std=gnu++0x'
       ],
-      
       'xcode_settings': {
         'CLANG_CXX_LANGUAGE_STANDARD': 'c++17',
         'MACOSX_DEPLOYMENT_TARGET': '10.9',
@@ -107,7 +106,6 @@
               '-lgqlite'
             ],
             'ldflags': [
-              # Ensure runtime linking is relative to sharp.node
               '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
             ]
           }
@@ -117,10 +115,11 @@
             'library_dirs': ['<!(pwd)/gqlite/build'],
             'libraries': [
               'libgqlite.dylib'
-            ],
-            'ldflags': [
-              # Ensure runtime linking is relative to sharp.node
-              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
+            ]
+          },
+          'xcode_settings': {
+            'OTHER_LDFLAGS': [
+              '-Wl,-rpath,\'<!(pwd)/gqlite/build\''
             ]
           }
         }]
