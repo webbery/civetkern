@@ -112,7 +112,7 @@
             ]
           }
         }],
-        ['OS=="mac"'. {
+        ['OS=="mac"', {
           "link_settings": {
             'library_dirs': ['<!(pwd)/gqlite/build'],
             'libraries': [
