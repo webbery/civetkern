@@ -57,9 +57,6 @@
           '-mmacosx-version-min=10.15',
           '-Wno-pessimizing-move'
           '-O3'
-        ],
-        "libraries": [
-          "-L<!(pwd)/gqlite/build/Release/libgqlite.a"
         ]
       },
       'conditions':[
@@ -69,8 +66,23 @@
 	            'msvs_settings': {
                 'VCCLCompilerTool': {
                   "ExceptionHandling": 1,
-                  'AdditionalOptions': [ '-std:c++17', '/LTCG:INCREMENTAL' ],
+                  'AdditionalOptions': [ '-std:c++17'],
+                  'WholeProgramOptimization': 'true',
                   'RuntimeTypeInfo': 'true'
+                },
+                'VCLibrarianTool': {
+                  'AdditionalOptions': [
+                    '/LTCG:INCREMENTAL'
+                  ]
+                },
+                'VCLinkerTool': {
+                  'ImageHasSafeExceptionHandlers': 'false',
+                  'OptimizeReferences': 2,
+                  'EnableCOMDATFolding': 2,
+                  'LinkIncremental': 1,
+                  'AdditionalOptions': [
+                    '/LTCG:INCREMENTAL'
+                  ]
                 }
               }
             },
@@ -89,9 +101,28 @@
           ]
         }],
         ['OS=="linux"', {
-          "libraries": [
-            "-L<!(pwd)/gqlite/build/Release/libgqlite.a"
-          ]
+          "link_settings": {
+            'library_dirs': ['<!(pwd)/gqlite/build'],
+            'libraries': [
+              '-lgqlite'
+            ],
+            'ldflags': [
+              # Ensure runtime linking is relative to sharp.node
+              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
+            ]
+          }
+        }],
+        ['OS=="mac"'. {
+          "link_settings": {
+            'library_dirs': ['<!(pwd)/gqlite/build'],
+            'libraries': [
+              'libgqlite.dylib'
+            ],
+            'ldflags': [
+              # Ensure runtime linking is relative to sharp.node
+              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
+            ]
+          }
         }]
       ]
     }
