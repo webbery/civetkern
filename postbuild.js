@@ -7,11 +7,12 @@ function runCommand(hookScript, workingDirectory) {
 let fs = require('fs')
 let os = require('os')
 if (os.platform() === "win32") {
-  runCommand('cp gqlite/build/Release/gqlite.dll build/Release/', '.')
+  fs.copyFileSync('gqlite/build/Release/gqlite.dll', 'build/Release/gqlite.dll')
+  // runCommand('copy gqlite/build/Release/gqlite.dll build/Release/', '.')
 }
 else if (os.platform() === "linux") {
-  // runCommand('cp gqlite/build/libgqlite.so build/Release/', '.')
+  runCommand('cp gqlite/build/libgqlite.so build/Release/', '.')
 }
 else if (os.platform() === "darwin") {
-  // runCommand('cp gqlite/build/libgqlite.dylid build/Release/', '.')
+  runCommand('cp gqlite/build/libgqlite.dylid build/Release/', '.')
 }

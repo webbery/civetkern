@@ -7,11 +7,11 @@
 #include "datum_type.h"
 
 namespace caxios{
-  class DBManager;
-  class CAxios {
+  class CivetStorage;
+  class CivetKernel {
   public:
-    explicit CAxios(const std::string& str, int flag, const std::string& meta = "");
-    ~CAxios();
+    explicit CivetKernel(const std::string& str, int flag, const std::string& meta = "");
+    ~CivetKernel();
 
     std::vector<FileID> GenNextFilesID(int cnt = 1);
     bool AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>& files);
@@ -39,10 +39,7 @@ namespace caxios{
     bool SearchFiles(const nlohmann::json& query, std::vector< FileInfo>& filesInfo);
 
   private:
-    static void Release(void* data);
-
-  private:
-    DBManager* m_pDBManager = nullptr;
+    CivetStorage* m_pStorage = nullptr;
   };
 }
 

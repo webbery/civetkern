@@ -3,28 +3,17 @@
 #include "json.hpp"
 #include <map>
 #include "log.h"
+#include "gqlite.h"
 #include "datum_type.h"
-#include "CompareType.h"
-#include "Keyword.h"
-#include "Condition.h"
-#include "Table.h"
-#include "RPN.h"
 
 #define TABLE_FILEID        32    // "file_cur_id"
 
 namespace caxios {
-  namespace tpp = tao::pegtl::parse_tree;
 
-  template<DataType Q, CompareType C> struct CQuery;
-  template<> struct CQuery<QT_String, CT_IN>;
-  template<> struct CQuery<QT_Color, CT_EQUAL>;
-
-  class CStorageProxy;
-
-  class DBManager {
+  class CivetStorage {
   public:
-    DBManager(const std::string& dbdir, int flag, const std::string& meta = "");
-    ~DBManager();
+    CivetStorage(const std::string& dbdir, int flag, const std::string& meta = "");
+    ~CivetStorage();
 
     std::vector<FileID> GenerateNextFilesID(int cnt = 1);
     bool AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>&);
@@ -54,7 +43,7 @@ namespace caxios {
     bool Remove(const std::string& sql);
 
   private:
-    void InitDB(CStorageProxy*& pDB, const char* dir, size_t size);
+    //void InitDB(CStorageProxy*& pDB, const char* dir, size_t size);
     void InitTable(const std::string& meta);
     void InitMap();
     void TryUpdate(const std::string& meta);
@@ -96,57 +85,22 @@ namespace caxios {
     std::string GetClassKey(const std::string& clsPath);
     std::vector<FileID> GetFilesOfClass(uint32_t clsID);
     std::vector<FileID> mapExistFiles(const std::vector<FileID>&);
-    void ParseMeta(const std::string& meta);
+    nlohmann::json ParseMeta(const std::string& meta);
     void SetSnapStep(FileID fileID, int bit, bool set=true);
     char GetSnapStep(FileID fileID, nlohmann::json&);
     Snap GetFileSnap(FileID);
     WordIndex GetWordIndex(const std::string& word);
-    std::unique_ptr< tpp::node > generate(const std::string& sql);
     bool InitBinaryTables();
     bool CanBeQuery(const nlohmann::json& meta);
 
-    template<typename T>
-    std::vector<std::string> GetWordByIndex(const T* const wordsIndx, size_t cnt) {
-      std::vector<std::string> vWords(cnt);
-      for (size_t idx = 0; idx < cnt; ++idx)
-      {
-        const T& index = wordsIndx[idx];
-        if (word_policy<T>::id(index) == 0) {
-          T_LOG("dict", "word index: 0");
-          continue;
-        }
-        void* pData = nullptr;
-        uint32_t len = 0;
-        if (!m_pDatabase->Get(TABLE_INDX_KEYWORD, word_policy<T>::id(index), pData, len)) continue;
-        std::string word((char*)pData, len);
-        vWords[idx] = word;
-      }
-      return std::move(vWords);
-    }
-    template<typename Itr>
-    std::map<WordIndex, std::string> GetWordByIndex(const Itr start, const Itr end) {
-      std::map<WordIndex, std::string> mWords;
-      for (Itr itr = start; itr != end; ++itr)
-      {
-        WordIndex index = *itr;
-        if (index == 0) {
-          T_LOG("dict", "word index: 0");
-          continue;
-        }
-        void* pData = nullptr;
-        uint32_t len = 0;
-        if (!m_pDatabase->Get(TABLE_INDX_KEYWORD, index, pData, len)) continue;
-        std::string word((char*)pData, len);
-        mWords[index] = word;
-      }
-      return std::move(mWords);
-    }
     std::vector<std::vector<FileID>> GetFilesIDByTagIndex(const WordIndex* const wordsIndx, size_t cnt);
 
   private:
+    void execGQL(const std::string& gql);
+  private:
     std::vector<std::string> _binTables;
     DBFlag _flag = ReadWrite;
-    CStorageProxy* m_pDatabase = nullptr;
+    gqlite* _pHandle = nullptr;
   };
   
 }

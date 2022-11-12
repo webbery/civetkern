@@ -3,26 +3,14 @@
     {
       "target_name": "civetkern",
       "sources": [
-        "src/lmdb/mdb.c",
-        "src/lmdb/midl.c",
         "src/util/util.cpp",
         "src/util/pinyin.cpp",
         "src/interface.cpp",
-        "src/database.cpp",
         "src/db_manager.cpp",
         "src/log.cpp",
         "src/DBThread.cpp",
-        "src/table/TableTag.cpp",
-        "src/table/TableMeta.cpp",
-        "src/table/TableBinaryMeta.cpp",
-        "src/table/TableClass.cpp",
-        "src/table/TableIndex.cpp",
-        "src/RPN.cpp",
-        "src/Condition.cpp",
-        "src/Table.cpp",
-        "src/Expression.cpp",
-        "src/StorageProxy.cpp",
         "src/upgrader.cpp",
+        "src/FileLink.cpp",
         "src/civetkern.cpp" ],
       "include_dirs": [
         "include",
@@ -45,6 +33,7 @@
         '-std=gnu++1y',
         '-std=gnu++0x'
       ],
+      
       'xcode_settings': {
         'CLANG_CXX_LANGUAGE_STANDARD': 'c++17',
         'MACOSX_DEPLOYMENT_TARGET': '10.9',
@@ -106,6 +95,7 @@
               '-lgqlite'
             ],
             'ldflags': [
+              # Ensure runtime linking is relative to sharp.node
               '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
             ]
           }
@@ -115,11 +105,10 @@
             'library_dirs': ['<!(pwd)/gqlite/build'],
             'libraries': [
               'libgqlite.dylib'
-            ]
-          },
-          'xcode_settings': {
-            'OTHER_LDFLAGS': [
-              '-Wl,-rpath,\'<!(pwd)/gqlite/build\''
+            ],
+            'ldflags': [
+              # Ensure runtime linking is relative to sharp.node
+              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
             ]
           }
         }]

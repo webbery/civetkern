@@ -1,6 +1,6 @@
 ﻿const {describe, it} = require('mocha')
 const {expect, assert} = require('chai')
-const instance = require('../build/Release/civetkern')
+const instance = require('../build/Debug/civetkern')
 
 let cfg = {
   app: {
