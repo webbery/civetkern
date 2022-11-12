@@ -10,135 +10,130 @@ using namespace v8;
 
 namespace caxios {
 
-	CAxios::CAxios(const std::string& str, int flag, const std::string& meta) {
-    T_LOG("CAxios", "new CAxios(%s)", str.c_str());
-    if (m_pDBManager == nullptr) {
-      m_pDBManager = new DBManager(str, flag, meta);
+	CivetKernel::CivetKernel(const std::string& str, int flag, const std::string& meta) {
+    T_LOG("CivetKernel", "new CivetKernel(%s)", str.c_str());
+    if (m_pStorage == nullptr) {
+      m_pStorage = new CivetStorage(str, flag, meta);
     }
   }
 
-  std::vector<FileID> CAxios::GenNextFilesID(int cnt)
+  std::vector<FileID> CivetKernel::GenNextFilesID(int cnt)
   {
-    return m_pDBManager->GenerateNextFilesID(cnt);
+    return m_pStorage->GenerateNextFilesID(cnt);
   }
 
-  bool CAxios::AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>& files)
+  bool CivetKernel::AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>& files)
   {
-    return m_pDBManager->AddFiles(files);
+    return m_pStorage->AddFiles(files);
   }
 
-  bool CAxios::AddClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID)
+  bool CivetKernel::AddClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID)
   {
-    return m_pDBManager->AddClasses(classes, filesID);
+    return m_pStorage->AddClasses(classes, filesID);
   }
 
-  bool CAxios::AddClasses(const std::vector<std::string>& classes)
+  bool CivetKernel::AddClasses(const std::vector<std::string>& classes)
   {
-    return m_pDBManager->AddClasses(classes);
+    return m_pStorage->AddClasses(classes);
   }
 
-  bool CAxios::AddMeta(const std::vector<FileID>& files, const nlohmann::json& meta)
+  bool CivetKernel::AddMeta(const std::vector<FileID>& files, const nlohmann::json& meta)
   {
-    return m_pDBManager->AddMeta(files, meta);
+    return m_pStorage->AddMeta(files, meta);
   }
 
-  bool CAxios::SetTags(const std::vector<FileID>& filesID, const std::vector<std::string>& tags)
+  bool CivetKernel::SetTags(const std::vector<FileID>& filesID, const std::vector<std::string>& tags)
   {
-    return m_pDBManager->SetTags(filesID, tags);
+    return m_pStorage->SetTags(filesID, tags);
   }
 
-  bool CAxios::GetFilesSnap(std::vector<Snap>& snaps)
+  bool CivetKernel::GetFilesSnap(std::vector<Snap>& snaps)
   {
-    return m_pDBManager->GetFilesSnap(snaps);
+    return m_pStorage->GetFilesSnap(snaps);
   }
 
-  bool CAxios::GetFilesInfo(const std::vector<FileID>& filesID, std::vector< FileInfo>& filesInfo)
+  bool CivetKernel::GetFilesInfo(const std::vector<FileID>& filesID, std::vector< FileInfo>& filesInfo)
   {
-    return m_pDBManager->GetFilesInfo(filesID, filesInfo);
+    return m_pStorage->GetFilesInfo(filesID, filesInfo);
   }
 
-  bool CAxios::GetUntagFiles(std::vector<FileID>& filesID)
+  bool CivetKernel::GetUntagFiles(std::vector<FileID>& filesID)
   {
-    return m_pDBManager->GetUntagFiles(filesID);
+    return m_pStorage->GetUntagFiles(filesID);
   }
 
-  bool CAxios::GetUnclassifyFiles(std::vector<FileID>& filesID)
+  bool CivetKernel::GetUnclassifyFiles(std::vector<FileID>& filesID)
   {
-    return m_pDBManager->GetUnClassifyFiles(filesID);
+    return m_pStorage->GetUnClassifyFiles(filesID);
   }
 
-  bool CAxios::GetTagsOfFiles(const std::vector<FileID>& filesID, std::vector<Tags>& tags)
+  bool CivetKernel::GetTagsOfFiles(const std::vector<FileID>& filesID, std::vector<Tags>& tags)
   {
-    return m_pDBManager->GetTagsOfFiles(filesID, tags);
+    return m_pStorage->GetTagsOfFiles(filesID, tags);
   }
 
-  bool CAxios::GetClasses(const std::string& parent, nlohmann::json& classes)
+  bool CivetKernel::GetClasses(const std::string& parent, nlohmann::json& classes)
   {
-    return m_pDBManager->GetClasses(parent, classes);
+    return m_pStorage->GetClasses(parent, classes);
   }
 
-  bool CAxios::getClassesInfo(const std::string& classPath, nlohmann::json& clsInfo)
+  bool CivetKernel::getClassesInfo(const std::string& classPath, nlohmann::json& clsInfo)
   {
-    return m_pDBManager->getClassesInfo(classPath, clsInfo);
+    return m_pStorage->getClassesInfo(classPath, clsInfo);
   }
 
-  bool CAxios::GetAllTags(TagTable& tags)
+  bool CivetKernel::GetAllTags(TagTable& tags)
   {
-    return m_pDBManager->GetAllTags(tags);
+    return m_pStorage->GetAllTags(tags);
   }
 
-  bool CAxios::UpdateFileMeta(const std::vector<FileID>& filesID, const nlohmann::json& mutation)
+  bool CivetKernel::UpdateFileMeta(const std::vector<FileID>& filesID, const nlohmann::json& mutation)
   {
-    return m_pDBManager->UpdateFileMeta(filesID, mutation);
+    return m_pStorage->UpdateFileMeta(filesID, mutation);
   }
 
-  bool CAxios::UpdateFilesClasses(const std::vector<FileID>& filesID, const std::vector<std::string>& classes)
+  bool CivetKernel::UpdateFilesClasses(const std::vector<FileID>& filesID, const std::vector<std::string>& classes)
   {
-    return m_pDBManager->UpdateFilesClasses(filesID, classes);
+    return m_pStorage->UpdateFilesClasses(filesID, classes);
   }
 
-  bool CAxios::UpdateClassName(const std::string& oldName, const std::string& newName)
+  bool CivetKernel::UpdateClassName(const std::string& oldName, const std::string& newName)
   {
-    return m_pDBManager->UpdateClassName(oldName, newName);
+    return m_pStorage->UpdateClassName(oldName, newName);
   }
 
-  bool CAxios::RemoveFiles(const std::vector<FileID>& files)
+  bool CivetKernel::RemoveFiles(const std::vector<FileID>& files)
   {
-    return m_pDBManager->RemoveFiles(files);
+    return m_pStorage->RemoveFiles(files);
   }
 
-  bool CAxios::RemoveTags(const std::vector<FileID>& files, const Tags& tags)
+  bool CivetKernel::RemoveTags(const std::vector<FileID>& files, const Tags& tags)
   {
-    return m_pDBManager->RemoveTags(files, tags);
+    return m_pStorage->RemoveTags(files, tags);
   }
 
-  bool CAxios::RemoveClasses(const std::vector<std::string>& classes)
+  bool CivetKernel::RemoveClasses(const std::vector<std::string>& classes)
   {
-    return m_pDBManager->RemoveClasses(classes);
+    return m_pStorage->RemoveClasses(classes);
   }
 
-  bool CAxios::RemoveClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID)
+  bool CivetKernel::RemoveClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID)
   {
-    return m_pDBManager->RemoveClasses(classes, filesID);
+    return m_pStorage->RemoveClasses(classes, filesID);
   }
 
-  bool CAxios::Query(const std::string& query, std::vector< FileInfo>& filesInfo)
+  bool CivetKernel::Query(const std::string& query, std::vector< FileInfo>& filesInfo)
   {
-    return m_pDBManager->Query(query, filesInfo);
+    return m_pStorage->Query(query, filesInfo);
   }
 
-  CAxios::~CAxios() {
+  CivetKernel::~CivetKernel() {
     T_LOG("CAxios", "Begin ~CAxios()");
-    if (m_pDBManager) {
-      delete m_pDBManager;
-      m_pDBManager = nullptr;
+    if (m_pStorage) {
+      delete m_pStorage;
+      m_pStorage = nullptr;
     }
     T_LOG("CAxios", "Finish ~CAxios()");
-  }
-
-  void CAxios::Release(void* data) {
-    T_LOG("CAxios", "CAxios::Release()");
-    // delete static_cast<CAxios*>(data);
   }
 
 }

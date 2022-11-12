@@ -26,6 +26,7 @@
 #include <string.h> 
 #endif
 #include "util/util.h"
+#include "gqlite.h"
 #define MAX_TRACE_SIZE  64
 
 namespace caxios {
@@ -34,7 +35,7 @@ namespace caxios {
       return strerror(err);
     }
     else {
-      return mdb_strerror(err);
+      //return gqlite_error(err);
     }
   }
 

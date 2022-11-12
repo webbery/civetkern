@@ -1,7 +1,7 @@
 {
     "name": "civetkern",
-    "version": "0.3.6",
-    "description": "civet database",
+    "version": "0.4.0",
+    "description": "civet business lib, database interface and resouces manage",
     "repository": {
         "type": "git",
         "url": "https://github.com/webbery/civetkern.git"
@@ -27,6 +27,7 @@
     "license": "MIT",
     "dependencies": {
         "node-addon-api": "^3.2.1",
+        "prebuild": "^11.0.4",
         "prebuild-install": "^7.1.1"
     },
     "devDependencies": {

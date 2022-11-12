@@ -8,7 +8,6 @@
 #include <locale.h>
 #include "json.hpp"
 #include "log.h"
-#include "gqlite.h"
 #if defined(__APPLE__) || defined(__gnu_linux__) || defined(__linux__) 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -22,7 +21,7 @@
 #define EXPORT_JS_FUNCTION_PARAM(name) exports.Set(#name, Napi::Function::New(env, caxios::name));
 
 namespace caxios {
-  CAxios* g_pCaxios = nullptr;
+  CivetKernel* g_pCaxios = nullptr;
   
   namespace {
     class UInt8Finalizer {
@@ -176,8 +175,7 @@ namespace caxios {
   }
   Napi::Value init(const Napi::CallbackInfo& info) {
     if (g_pCaxios) return Napi::Value::From(info.Env(), true);
-    gqlite* g_handle = nullptr;
-    gqlite_open(&g_handle, nullptr);
+    
     init_trace();
     //setlocale(LC_ALL, "");
     Napi::Object options = info[0].As<Napi::Object>();
@@ -211,7 +209,10 @@ namespace caxios {
       }
       std::string meta = Stringify(info.Env(), resource.Get("meta").As<Napi::Object>());
       T_LOG("init", "schema: %s", meta.c_str());
-      g_pCaxios = new CAxios(path, readOnly, meta);
+      if (g_pCaxios) {
+          delete g_pCaxios;
+      }
+      g_pCaxios = new CivetKernel(path, readOnly, meta);
       T_LOG("interface", "init success");
     }
     return Napi::Value::From(info.Env(), true);
