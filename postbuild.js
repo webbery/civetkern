@@ -14,5 +14,6 @@ else if (os.platform() === "linux") {
   runCommand('cp gqlite/build/libgqlite.so build/Release/', '.')
 }
 else if (os.platform() === "darwin") {
-  runCommand('cp gqlite/build/libgqlite.dylid build/Release/', '.')
+  // runCommand('cp gqlite/build/libgqlite.dylid build/Release/', '.')
+  runCommand('cp gqlite/build/Release/libgqlite.dylid build/Release/', '.')
 }
