@@ -222,6 +222,58 @@ namespace caxios {
     return s;
   }
 
+  std::string replace_all(const std::string& input, const std::string& origin, const std::string& newer)
+  {
+    std::string data(input);
+    size_t pos = 0;
+    while ((pos = data.find(origin, pos)) != std::string::npos) {
+      data = data.replace(pos, origin.size(), newer);
+      pos += newer.size();
+    }
+    return data;
+  }
+
+  std::string normalize(const std::string& gql)
+  {
+    std::string result(gql);
+    enum class ChangeStat {
+      Start,
+      Splash,
+      End
+    };
+    ChangeStat previous = ChangeStat::End;
+    ChangeStat cur = ChangeStat::End;
+    for (size_t pos = 0, len = result.size(); pos != len; ++pos) {
+      if (result[pos] == '"') {
+        switch (previous) {
+        case ChangeStat::Splash:
+          previous = cur;
+          continue;
+        case ChangeStat::Start:
+          cur = ChangeStat::End;
+          previous = ChangeStat::End;
+          break;
+        case ChangeStat::End:
+          cur = ChangeStat::Start;
+          previous = ChangeStat::Start;
+          break;
+        default:break;
+        }
+        result[pos] = '\'';
+      }
+      else if (result[pos] == '\\') {
+        previous = ChangeStat::Splash;
+        continue;
+      }
+      previous = cur;
+    }
+
+    result = replace_all(result, "\\u0000", "");
+    // convert datetime, array
+    std::regex patternDatetime("'(\\w+)':");
+    return std::regex_replace(result, patternDatetime, "$1:");
+  }
+
   bool HasAttr(Napi::Object obj, std::string attr)
   {
     return obj.Has(attr);

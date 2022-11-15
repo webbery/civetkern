@@ -121,7 +121,7 @@ namespace caxios {
   uint32_t str2color(const std::string& input);
 
   std::wstring string2wstring(const std::string& str);
-
+  std::string normalize(const std::string& gql);
 }
 
 #endif

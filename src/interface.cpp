@@ -176,12 +176,6 @@ namespace caxios {
   }
   Napi::Value init(const Napi::CallbackInfo& info) {
     if (g_pCaxios) return Napi::Value::From(info.Env(), true);
-<<<<<<< HEAD
-    gqlite* g_handle = nullptr;
-    gqlite_open(&g_handle, nullptr);
-=======
-    
->>>>>>> feature/gqlite
     init_trace();
     //setlocale(LC_ALL, "");
     Napi::Object options = info[0].As<Napi::Object>();

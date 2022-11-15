@@ -116,7 +116,17 @@ namespace caxios {
 
   void CivetStorage::InitTable(const std::string& meta) {
     auto group = ParseMeta(meta);
-    std::string gql = std::string("{create: '.civet', group: ") + group.dump() + "};";
+    std::string gql = std::string("{create: 'civet', group: [") + group.dump() + "]};";
+    /*
+      "{create: 'movielens_db',"
+      "group: ["
+        "{movie: ['title', 'genres']},"
+        "{tag: ['user_id', 'tag', 'movie_id']},"
+        "{rate: ['user_id', 'rate', 'movie_id']}"
+      "]"
+    "};"
+    */
+    gql = caxios::normalize(gql);
     execGQL(gql);
   }
 
