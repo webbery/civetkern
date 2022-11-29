@@ -143,9 +143,9 @@ namespace caxios {
     std::string groupTag = "{" TABLE_TAG ": 'name' }";
     std::string groupClass = "{" TABLE_CLASS ": '" TABLE_CLASS_TITLE "' }";
     std::string groupKeyword = "{" TABLE_KEYWORD ": 'name' }";
-    std::string tagRelation = "'" TABLE_RELATION_TAG "'";
-    std::string clsRelation = "'" TABLE_RELATION_CLASS "'";
-    std::string keyordRelation = "'" TABLE_RELATION_KEYWORD "'";
+    std::string tagRelation = "['" TABLE_FILE "','" TABLE_RELATION_TAG "', '" TABLE_TAG "']";
+    std::string clsRelation = "['" TABLE_FILE "', '" TABLE_RELATION_CLASS "', '" TABLE_CLASS "']";
+    std::string keyordRelation = "['" TABLE_FILE "', '" TABLE_RELATION_KEYWORD "', '" TABLE_KEYWORD "']";
     std::string gql = std::string("{create: '" GRAPH_NAME "', group: [") + group.dump()
       + ", " + groupTag + ", " + groupClass + ", " + groupKeyword
       + ", " + tagRelation + ", " + clsRelation + ", " + keyordRelation

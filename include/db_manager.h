@@ -2,6 +2,7 @@
 #define _CAXIOS_DB_MANAGER_H_
 #include "json.hpp"
 #include <map>
+#include <list>
 #include "log.h"
 #include "gqlite.h"
 #include "datum_type.h"
