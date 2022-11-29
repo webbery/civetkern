@@ -22,7 +22,7 @@
 #define EXPORT_JS_FUNCTION_PARAM(name) exports.Set(#name, Napi::Function::New(env, caxios::name));
 
 namespace caxios {
-  CivetKernel* g_pCaxios = nullptr;
+  CivetKernel* g_pCivetKernel = nullptr;
   
   namespace {
     class UInt8Finalizer {
@@ -43,6 +43,26 @@ namespace caxios {
       uint8_t* _ptr = nullptr;
     };
 
+    uint64_t snowflake2(uint16_t inputID) {
+      static constexpr long sequenceBit = 8;
+      static constexpr long inputBit = 16;
+      static constexpr long timestampShift = sequenceBit + inputBit;
+      static constexpr long TWEPOCH = 1420041600000;
+      thread_local long sequence = 0;
+      thread_local long sequenceMask = -1L ^ (-1L << sequenceBit);
+      thread_local auto lastTimeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      auto curTimeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      if (curTimeStamp == lastTimeStamp) {
+        sequence = (sequenceMask + 1) & sequenceMask;
+      }
+      else {
+        lastTimeStamp = curTimeStamp;
+      }
+      return ((curTimeStamp - TWEPOCH) << timestampShift)
+        | (inputID << sequenceBit)
+        | sequence;
+    }
+
     Napi::Object FileInfo2Object(napi_env env, const FileInfo& info) {
       Napi::Object obj = Napi::Object::New(env);
       obj.Set("id", std::get<0>(info));
@@ -59,7 +79,7 @@ namespace caxios {
           type = ptr->second;
         }
         for (auto itr = item.begin(); itr != item.end(); ++itr) {
-          if (itr->second[0] == '^') { // datetime
+          if (itr->second[0] == '0' && itr->second[1] == 'd') { // datetime
             std::string num = itr->second.substr(1);
             if (isNumber(num)) {
               double dTime = atof(num.c_str());
@@ -168,14 +188,15 @@ namespace caxios {
   }
 
   Napi::Value release(const Napi::CallbackInfo& info){
-    if (g_pCaxios) {
-      delete g_pCaxios;
-      g_pCaxios = nullptr;
+    if (g_pCivetKernel) {
+      delete g_pCivetKernel;
+      g_pCivetKernel = nullptr;
     }
     return info.Env().Undefined();
   }
+
   Napi::Value init(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) return Napi::Value::From(info.Env(), true);
+    if (g_pCivetKernel) return Napi::Value::From(info.Env(), true);
     init_trace();
     //setlocale(LC_ALL, "");
     Napi::Object options = info[0].As<Napi::Object>();
@@ -209,21 +230,26 @@ namespace caxios {
       }
       std::string meta = Stringify(info.Env(), resource.Get("meta").As<Napi::Object>());
       T_LOG("init", "schema: %s", meta.c_str());
-      if (g_pCaxios) {
-          delete g_pCaxios;
+      if (g_pCivetKernel) {
+          delete g_pCivetKernel;
       }
-      g_pCaxios = new CivetKernel(path, readOnly, meta);
+      g_pCivetKernel = new CivetKernel(path, readOnly, meta);
       T_LOG("interface", "init success");
     }
     return Napi::Value::From(info.Env(), true);
   }
 
   Napi::Value generateFilesID(const Napi::CallbackInfo& info) {
-    if (g_pCaxios != nullptr) {
+    if (g_pCivetKernel != nullptr) {
       Napi::Number oCnt = info[0].As<Napi::Number>();
       int cnt = oCnt.Int32Value();
       if (cnt <= 0) return Napi::Value();
-      std::vector<FileID> gid = g_pCaxios->GenNextFilesID(cnt);
+
+      std::vector<FileID> gid;
+      for (int i = 0; i < cnt; ++i) {
+        gid.push_back(snowflake2(i + 1));
+      }
+
       Napi::Env env = info.Env();
       Napi::Array array = Napi::Array::New(env, gid.size());
       for (unsigned int i = 0; i < gid.size(); ++i) {
@@ -239,7 +265,7 @@ namespace caxios {
    * @param info describe here: https://www.yuque.com/webberg/dacstu/gi9q59#comment-880091
    */
   Napi::Value addFiles(const Napi::CallbackInfo& info) {
-    if (g_pCaxios != nullptr) {
+    if (g_pCivetKernel != nullptr) {
       auto env = info.Env();
       std::vector <std::tuple< FileID, MetaItems, Keywords >> vFiles;
       FileID fileID = 0;
@@ -277,7 +303,7 @@ namespace caxios {
               else if( obj.IsDate()) {
                 //std::string sVal = obj.As<Napi::Date>().As<Napi::String>();
                 double timestamp = obj.As<Napi::Date>().ValueOf();
-                sVal = std::string("^") + std::to_string(timestamp);
+                sVal = std::string("0d") + std::to_string(timestamp);
                 T_LOG("file", "add file, date value: %s", sVal.c_str());
               }
 #endif
@@ -305,7 +331,7 @@ namespace caxios {
           vFiles.emplace_back(std::make_tuple(fileID, metaItems,keywords));
         }
       });
-      if (!g_pCaxios->AddFiles(vFiles)) {
+      if (!g_pCivetKernel->AddFiles(vFiles)) {
         T_LOG("interface", "addFiles fail");
         return Napi::Boolean::From(info.Env(), false);
       }
@@ -316,24 +342,24 @@ namespace caxios {
   }
 
   Napi::Value setTags(const Napi::CallbackInfo& info) {
-    if (g_pCaxios == nullptr) return Napi::Boolean::From(info.Env(), false);
+    if (g_pCivetKernel == nullptr) return Napi::Boolean::From(info.Env(), false);
     auto obj = info[0].As<Napi::Object>();
     auto ids = AttrAsArray(obj, "id");
     auto tags = AttrAsArray(obj, "tag");
     std::vector<FileID> vFileID = ArrayAsUint32Vector(ids);
     std::vector<std::string> vTags = ArrayAsStringVector(tags);
     T_LOG("interface", "start set tags, input file ids: %s, tags: %s", format_vector(vFileID).c_str(), format_vector(vTags).c_str());
-    if (!g_pCaxios->SetTags(vFileID, vTags)) {
+    if (!g_pCivetKernel->SetTags(vFileID, vTags)) {
       return Napi::Boolean::From(info.Env(), false);
     }
     return Napi::Boolean::From(info.Env(), true);
   }
   Napi::Value addClasses(const Napi::CallbackInfo& info) {
-    if (g_pCaxios == nullptr) return Napi::Boolean::From(info.Env(), false);
+    if (g_pCivetKernel == nullptr) return Napi::Boolean::From(info.Env(), false);
     if (info[0].IsArray()) {
       auto classesName = info[0].As<Napi::Array>();
       std::vector<std::string> vClasses = ArrayAsStringVector(classesName);
-      if (!g_pCaxios->AddClasses(vClasses)) {
+      if (!g_pCivetKernel->AddClasses(vClasses)) {
         return Napi::Boolean::From(info.Env(), false);
       }
       return Napi::Boolean::From(info.Env(), true);
@@ -345,7 +371,7 @@ namespace caxios {
       std::vector<FileID> vFileID = ArrayAsUint32Vector(ids);
       std::vector<std::string> vClasses = ArrayAsStringVector(clsNames);
       T_LOG("interface", "add files to classes");
-      if (!g_pCaxios->AddClasses(vClasses, vFileID)) {
+      if (!g_pCivetKernel->AddClasses(vClasses, vFileID)) {
         return Napi::Boolean::From(info.Env(), false);
       }
       return Napi::Boolean::From(info.Env(), true);
@@ -355,8 +381,8 @@ namespace caxios {
   // void addAnotation(const v8::FunctionCallbackInfo<v8::Value>& info) {}
   // void addKeyword(const v8::FunctionCallbackInfo<v8::Value>& info) {}
   
-  Napi::Value addMeta(const Napi::CallbackInfo& info) {
-    if (g_pCaxios == nullptr) return Napi::Boolean::From(info.Env(), false);
+  Napi::Value upsetMeta(const Napi::CallbackInfo& info) {
+    if (g_pCivetKernel == nullptr) return Napi::Boolean::From(info.Env(), false);
     /// <summary>
     /// add/update meta info to database, if cache is enable, shared memory is used to save it.
     /// </summary>
@@ -391,7 +417,7 @@ namespace caxios {
     jmt["name"] = name;
     jmt["type"] = type;
     T_LOG("meta", "add meta to file %s", format_vector(ids).c_str());
-    if (g_pCaxios->AddMeta(ids, jmt)) {
+    if (g_pCivetKernel->UpsetMeta(ids, jmt)) {
       return Napi::Boolean::From(info.Env(), true);
     }
     return Napi::Boolean::From(info.Env(), false);
@@ -399,7 +425,7 @@ namespace caxios {
 
   Napi::Value updateFile(const Napi::CallbackInfo& info) {
     // 0: query, 1: new value
-    if (!g_pCaxios) return Napi::Boolean::From(info.Env(), false);
+    if (!g_pCivetKernel) return Napi::Boolean::From(info.Env(), false);
     auto obj = info[0].As<Napi::Object>();
     auto filesID = AttrAsUint32Vector(obj, "id");
     auto props = obj.GetPropertyNames();
@@ -418,39 +444,39 @@ namespace caxios {
       }
     }
     T_LOG("file", "mutation: %s", meta.dump().c_str());
-    g_pCaxios->UpdateFileMeta(filesID, meta);
+    g_pCivetKernel->UpsetMeta(filesID, meta);
     return Napi::Boolean::From(info.Env(), true);
   }
   Napi::Value updateFileKeywords(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
   }
   Napi::Value updateFileTags(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       auto obj = info[0].As<Napi::Object>();
       auto filesID = AttrAsUint32Vector(obj, "id");
       auto tags = AttrAsStringVector(obj, "tag");
-      g_pCaxios->SetTags(filesID, tags);
+      g_pCivetKernel->SetTags(filesID, tags);
     }
     return info.Env().Undefined();
   }
   Napi::Value updateFileClass(const Napi::CallbackInfo& info) {
-    if (!g_pCaxios) return Napi::Boolean::From(info.Env(), false);
+    if (!g_pCivetKernel) return Napi::Boolean::From(info.Env(), false);
     auto sql = info[0].As<Napi::Object>();
     auto filesID = AttrAsUint32Vector(sql, "id");
     auto classes = AttrAsStringVector(sql, "class");
-    bool result = g_pCaxios->UpdateFilesClasses(filesID, classes);
+    bool result = g_pCivetKernel->UpdateFilesClasses(filesID, classes);
     return Napi::Boolean::From(info.Env(), result);
   }
   Napi::Value updateClassName(const Napi::CallbackInfo& info) {
-    if (!g_pCaxios) return Napi::Boolean::From(info.Env(), false);
+    if (!g_pCivetKernel) return Napi::Boolean::From(info.Env(), false);
     std::string oldName = info[0].As<Napi::String>();
     std::string newName = info[1].As<Napi::String>();
-    bool result = g_pCaxios->UpdateClassName(oldName, newName);
+    bool result = g_pCivetKernel->UpdateClassName(oldName, newName);
     return Napi::Boolean::From(info.Env(), result);
   }
 
   Napi::Value getFilesInfo(const Napi::CallbackInfo& cbInfo) {
-    if (g_pCaxios != nullptr) {
+    if (g_pCivetKernel != nullptr) {
       if (cbInfo[0].IsArray()) {
         Napi::Array aFilesID = cbInfo[0].As<Napi::Array>();
         std::vector< FileInfo > filesInfo;
@@ -460,7 +486,7 @@ namespace caxios {
           filesID.emplace_back(fid);
         });
         T_LOG("interface", "files info %s", format_vector(filesID).c_str());
-        bool result = g_pCaxios->GetFilesInfo(filesID, filesInfo);
+        bool result = g_pCivetKernel->GetFilesInfo(filesID, filesInfo);
         Napi::Array array = Napi::Array::New(cbInfo.Env(), filesInfo.size());
         for (unsigned int i = 0; i < filesInfo.size(); ++i) {
           Napi::Object obj = FileInfo2Object(cbInfo.Env(), filesInfo[i]);
@@ -472,9 +498,9 @@ namespace caxios {
     return cbInfo.Env().Undefined();
   }
   Napi::Value getFilesSnap(const Napi::CallbackInfo& info) {
-    if (g_pCaxios != nullptr) {
+    if (g_pCivetKernel != nullptr) {
       std::vector<Snap> snaps;
-      g_pCaxios->GetFilesSnap(snaps);
+      g_pCivetKernel->GetFilesSnap(snaps);
       Napi::Array array = Napi::Array::New(info.Env(), snaps.size());
       for (unsigned int i = 0; i < snaps.size(); ++i) {
         auto obj = Napi::Object::New(info.Env());
@@ -488,10 +514,10 @@ namespace caxios {
     return info.Env().Undefined();
   }
   Napi::Value getAllTags(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       // return {A: [{locale: abaaba, name: tagname, files: [id1, id2, ...]}], ...}
       TagTable vTags;
-      g_pCaxios->GetAllTags(vTags);
+      g_pCivetKernel->GetAllTags(vTags);
       Napi::Object allTags = Napi::Object::New(info.Env());
       for (auto& item : vTags) {
         auto& tags = item.second;
@@ -516,9 +542,9 @@ namespace caxios {
     return info.Env().Undefined();
   }
   Napi::Value getUnTagFiles(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       std::vector<FileID> vFilesID;
-      if (!g_pCaxios->GetUntagFiles(vFilesID)) {
+      if (!g_pCivetKernel->GetUntagFiles(vFilesID)) {
         T_LOG("interface", "get untag file fail");
       }
       else {
@@ -534,9 +560,9 @@ namespace caxios {
     return info.Env().Undefined();
   }
   Napi::Value getUnClassifyFiles(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       std::vector<FileID> vFilesID;
-      g_pCaxios->GetUnclassifyFiles(vFilesID);
+      g_pCivetKernel->GetUnclassifyFiles(vFilesID);
       Napi::Env env = info.Env();
       Napi::Array array = Napi::Array::New(env, vFilesID.size());
       for (unsigned int i = 0; i < vFilesID.size(); ++i) {
@@ -547,11 +573,11 @@ namespace caxios {
     return info.Env().Undefined();
   }
   Napi::Value getClasses(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       std::string sParent("/");
       T_LOG("class", "get classes");
       nlohmann::json classes = nlohmann::json::array();
-      g_pCaxios->GetClasses(sParent, classes);
+      g_pCivetKernel->GetClasses(sParent, classes);
       Napi::Env env = info.Env();
       return Parse(env, classes.dump());
       //auto arry = Classes2Array(env, classes);
@@ -560,26 +586,26 @@ namespace caxios {
     return Napi::Value();
   }
   Napi::Value getClassesInfo(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       std::string sParent("/");
       if (info.Length() != 0) {
         sParent = info[0].As<Napi::String>();
       }
       T_LOG("class", "get classes info");
       nlohmann::json classes = nlohmann::json::array();
-      g_pCaxios->getClassesInfo(sParent, classes);
+      g_pCivetKernel->getClassesInfo(sParent, classes);
       Napi::Env env = info.Env();
       return Parse(env, classes.dump());
     }
     return Napi::Value();
   }
   Napi::Value getTagsOfFiles(const Napi::CallbackInfo & info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       Napi::Object obj = info[0].As<Napi::Object>();
       auto aFilesID = AttrAsArray(obj, "id");
       std::vector<FileID> vFilesID = ArrayAsUint32Vector(aFilesID);
       std::vector<Tags> vTags;
-      g_pCaxios->GetTagsOfFiles(vFilesID, vTags);
+      g_pCivetKernel->GetTagsOfFiles(vFilesID, vTags);
       Napi::Array array = Napi::Array::New(info.Env(), vTags.size());
       return array;
     }
@@ -587,13 +613,13 @@ namespace caxios {
   }
 
   Napi::Value removeFiles(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       auto arr = info[0].As<Napi::Array>();
       std::vector<FileID> vFilesID(arr.Length());
       for (unsigned int i = 0; i < arr.Length(); i++) {
         vFilesID[i] = AttrAsUint32(arr, i);
       }
-      if (g_pCaxios->RemoveFiles(vFilesID)) {
+      if (g_pCivetKernel->RemoveFiles(vFilesID)) {
         T_LOG("interface", "Remove files finish");
         return Napi::Boolean::From(info.Env(), true);
       }
@@ -601,29 +627,29 @@ namespace caxios {
     return Napi::Boolean::From(info.Env(), false);
   }
   Napi::Value removeTags(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       Napi::Object obj = info[0].As<Napi::Object>();
       auto aFilesID = AttrAsUint32Vector(obj, "id");
       auto aTags = AttrAsStringVector(obj, "tag");
-      bool result = g_pCaxios->RemoveTags(aFilesID, aTags);
+      bool result = g_pCivetKernel->RemoveTags(aFilesID, aTags);
       return Napi::Boolean::From(info.Env(), result);
     }
     return Napi::Boolean::From(info.Env(), false);
   }
   Napi::Value removeClasses(const Napi::CallbackInfo& info) {
-    if (g_pCaxios) {
+    if (g_pCivetKernel) {
       bool result = false;
       if (info[0].IsArray()) {
         Napi::Array arr = info[0].As<Napi::Array>();
         auto classes = ArrayAsStringVector(arr);
         T_LOG("DEBUG", "class count: %d", classes.size());
-        result = g_pCaxios->RemoveClasses(classes);
+        result = g_pCivetKernel->RemoveClasses(classes);
       }
       else if (info[0].IsObject()) {
         Napi::Object obj = info[0].As<Napi::Object>();
         auto aFilesID = AttrAsUint32Vector(obj, "id");
         auto aClasses = AttrAsStringVector(obj, "class");
-        result = g_pCaxios->RemoveClasses(aClasses, aFilesID);
+        result = g_pCivetKernel->RemoveClasses(aClasses, aFilesID);
       }
       return Napi::Boolean::From(info.Env(), result);
     }
@@ -631,12 +657,12 @@ namespace caxios {
   }
 
   Napi::Value query(const Napi::CallbackInfo& info) {
-    if (g_pCaxios != nullptr) {
+    if (g_pCivetKernel != nullptr) {
       if (!info[0].IsUndefined()) {
         auto str = Stringify(info.Env(), info[0].As<Napi::Object>());
         try {
           std::vector<FileInfo> vFiles;
-          g_pCaxios->Query(str, vFiles);
+          g_pCivetKernel->Query(str, vFiles);
           Napi::Env env = info.Env();
           Napi::Array array = Napi::Array::New(env, vFiles.size());
           for (unsigned int i = 0; i < vFiles.size(); ++i) {
@@ -686,7 +712,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   EXPORT_JS_FUNCTION_PARAM(addFiles);
   EXPORT_JS_FUNCTION_PARAM(setTags);            // depreciate
   EXPORT_JS_FUNCTION_PARAM(addClasses);
-  EXPORT_JS_FUNCTION_PARAM(addMeta);
+  EXPORT_JS_FUNCTION_PARAM(upsetMeta);
   EXPORT_JS_FUNCTION_PARAM(updateFile);
   EXPORT_JS_FUNCTION_PARAM(updateFileKeywords); // depreciate
   EXPORT_JS_FUNCTION_PARAM(updateFileTags);     // depreciate

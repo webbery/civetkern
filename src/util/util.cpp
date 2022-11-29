@@ -274,6 +274,54 @@ namespace caxios {
     return std::regex_replace(result, patternDatetime, "$1:");
   }
 
+  std::string json2gql(const nlohmann::json& input)
+  {
+    std::string gql = input.dump();
+    // 主要任务: key去掉双引号, 连续\\ 转\, value中的双引号字符串改成单引号字符串 
+    enum class Status {
+      Start,
+      Splash,
+      End
+    };
+    Status previous = Status::End;
+    int prevPos = 0;
+    Status cur = Status::End;
+    for (int index = 0; index < gql.size(); ++index) {
+      if (gql[index] == '"') {
+        switch (previous) {
+        case Status::Splash:
+          previous = cur;
+          continue;
+        case Status::Start:
+          cur = Status::End;
+          previous = Status::End;
+          if (gql[index + 1] == ':') {
+            // match key
+            gql.erase(gql.begin() + index, gql.begin() + index + 1);
+            gql.erase(gql.begin() + prevPos, gql.begin() + prevPos + 1);
+            index -= 1;
+            continue;
+          }
+          break;
+        case Status::End:
+          cur = Status::Start;
+          previous = Status::Start;
+          prevPos = index;
+          break;
+        default:break;
+        }
+        gql[index] = '\'';
+      }
+      else if (gql[index] == '\\') {
+        if (gql[index + 1] == '\\') {
+          gql.erase(gql.begin() + index, gql.begin() + index + 1);
+          index -= 1;
+        }
+      }
+    }
+    return gql;
+  }
+
   bool HasAttr(Napi::Object obj, std::string attr)
   {
     return obj.Has(attr);

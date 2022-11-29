@@ -4,6 +4,7 @@
 #include <node.h>
 #include <napi.h>
 #include <functional>
+#include <json.hpp>
 #include "datum_type.h"
 
 #define UNIVERSAL_DELIMITER '/'
@@ -122,6 +123,7 @@ namespace caxios {
 
   std::wstring string2wstring(const std::string& str);
   std::string normalize(const std::string& gql);
+  std::string json2gql(const nlohmann::json& input);
 }
 
 #endif

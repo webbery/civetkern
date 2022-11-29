@@ -13,23 +13,19 @@
 #define TABLE_SCHEMA        "dbinfo"
 #define TABLE_FILESNAP      "file_snap"
 #define TABLE_FILE          "file_meta"
-#define TABLE_KEYWORD_INDX  "keyword2indx"
-#define TABLE_INDX_KEYWORD  "indx2keyword"
-#define TABLE_KEYWORD2FILE  "keyword2file"
-#define TABLE_FILE2KEYWORD  "file2keyword"
-#define TABLE_KEYWORD2CLASS "keyword2class" // word index -> classes
-#define TABLE_FILE2TAG      "file2tag"      // fileID -> tag
-#define TABLE_TAG           "tags"          // tag -> fileID
-#define TABLE_TAG_INDX      "tag_indx"      // alphabet -> tag indx
-#define TABLE_CLASS2HASH    "class2hash"    // class -> hash, so that when class name change, hash can not be change
-#define TABLE_HASH2CLASS    "hash2class"    // hash -> class
-#define TABLE_FILE2CLASS    "file2class"    // fileID -> class hash
-#define TABLE_CLASS         "classes"       // class hash -> fileID
+#define TABLE_KEYWORD       "keywords"
+#define TABLE_TAG           "tags"
+#define TABLE_CLASS         "classes"
+#define TABLE_RELATION_KEYWORD "kw_rel"
+#define TABLE_RELATION_CLASS "cls_rel"
+#define TABLE_RELATION_TAG  "tag_rel"
+#define TABLE_CLASS_TITLE   "title"
 #define TABLE_COUNT         "count"         // about count of some statistic
 #define TABLE_ANNOTATION    "annotation"
 #define TABLE_MATCH_META    "match_meta"
 #define TABLE_MATCH         "match_t"
 #define TABLE_RECYCLE_ID    "recycle"
+#define GRAPH_NAME          "civet"
 
 #define SCHEMA_VERSION    2
 
@@ -58,7 +54,46 @@ namespace caxios {
     TABLE_MATCH
   };
 
-  namespace {
+    int gqlite_callback_func(gqlite_result* result, void* handle) {
+      if (result->errcode != ECode_Success) return result->errcode;
+      IGQLExecutor* excutor = (IGQLExecutor*)handle;
+      if (excutor) {
+        excutor->_rs._result = result;
+        return true;
+      }
+      return false;
+    }
+
+    namespace {
+
+    class QueryExecutor : public IGQLExecutor {
+    public:
+      QueryExecutor(CivetStorage* storage, const std::string&) : _storage(storage) {}
+      virtual bool execute() {
+        return true;
+      }
+      virtual const ResultSet& get() const {
+        return _rs;
+      }
+
+    private:
+      CivetStorage* _storage;
+    };
+
+    class UpsetTagExecutor : public IGQLExecutor {
+    public:
+      UpsetTagExecutor(CivetStorage* storage, const std::string&) {
+        _storage = storage;
+      }
+      virtual bool execute() {
+        return true;
+      }
+
+      virtual const ResultSet& get() const {}
+    private:
+      CivetStorage* _storage;
+    };
+
     std::vector<WordIndex> transform(const std::vector<std::string>& words, std::map<std::string, WordIndex>& mIndexes) {
       std::vector<WordIndex> vIndexes;
       vIndexes.resize(words.size());
@@ -68,10 +103,6 @@ namespace caxios {
       return vIndexes;
     }
 
-    int gqlite_callback_func(gqlite_result* result, void* handle) {
-      CivetStorage* storage = (CivetStorage*)handle;
-      if (result->errcode != ECode_Success) return result->errcode;
-    }
   }
 
   CivetStorage::CivetStorage(const std::string& dbdir, int flag, const std::string& meta/* = ""*/)
@@ -98,36 +129,36 @@ namespace caxios {
     if (_pHandle) {
       gqlite_close(_pHandle);
     }
-    //if (m_pDatabase != nullptr) {
-    //  int cnt = sizeof(g_tables) / sizeof(char*);
-    //  for (int idx = 0; idx < cnt; ++idx) {
-    //    m_pDatabase->CloseDatabase(g_tables[idx]);
-    //  }
-    //  delete m_pDatabase;
-    //  m_pDatabase = nullptr;
-    //}
+    ClearTasks();
   }
 
-  void CivetStorage::execGQL(const std::string& gql) {
+  void CivetStorage::execGQL(const std::string& gql, IGQLExecutor* executor) {
     char* ptr = nullptr;
-    gqlite_exec(_pHandle, gql.c_str(), gqlite_callback_func, this, &ptr);
-    gqlite_free(ptr);
+    gqlite_exec(_pHandle, gql.c_str(), gqlite_callback_func, executor, &ptr);
+    if (ptr) gqlite_free(ptr);
   }
 
   void CivetStorage::InitTable(const std::string& meta) {
     auto group = ParseMeta(meta);
-    std::string gql = std::string("{create: 'civet', group: [") + group.dump() + "]};";
+    std::string groupTag = "{" TABLE_TAG ": 'name' }";
+    std::string groupClass = "{" TABLE_CLASS ": '" TABLE_CLASS_TITLE "' }";
+    std::string groupKeyword = "{" TABLE_KEYWORD ": 'name' }";
+    std::string tagRelation = "'" TABLE_RELATION_TAG "'";
+    std::string clsRelation = "'" TABLE_RELATION_CLASS "'";
+    std::string keyordRelation = "'" TABLE_RELATION_KEYWORD "'";
+    std::string gql = std::string("{create: '" GRAPH_NAME "', group: [") + group.dump()
+      + ", " + groupTag + ", " + groupClass + ", " + groupKeyword
+      + ", " + tagRelation + ", " + clsRelation + ", " + keyordRelation
+      + "]};";
     /*
-      "{create: 'movielens_db',"
-      "group: ["
-        "{movie: ['title', 'genres']},"
-        "{tag: ['user_id', 'tag', 'movie_id']},"
-        "{rate: ['user_id', 'rate', 'movie_id']}"
-      "]"
-    "};"
+      {create: 'civet', group: [
+        {file_meta:['color','size','path','filename','type','datetime','addtime','width','height'],
+          index:['color','size','type','datetime','addtime']},
+        'tag', 'clazz', 'kw'
+       ]};
     */
     gql = caxios::normalize(gql);
-    execGQL(gql);
+    execGQL(gql, nullptr);
   }
 
   std::vector<caxios::FileID> CivetStorage::GenerateNextFilesID(int cnt /*= 1*/)
@@ -138,136 +169,127 @@ namespace caxios {
     return filesID;
   }
 
-  bool CivetStorage::AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>& files)
-  {
-    if (_flag == ReadOnly) return false;
-    //WRITE_BEGIN();
-    //for (auto item : files) {
-    //  T_LOG("performance", "Start");
-    //  if (!AddFile(std::get<0>(item), std::get<1>(item), std::get<2>(item))) {
-    //    return false;
-    //  }
-    //}
-    //WRITE_END();
-    return true;
-  }
-
   bool CivetStorage::AddClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID)
   {
     if (_flag == ReadOnly || classes.size() == 0) return false;
-    //WRITE_BEGIN();
-    //std::vector<FileID> existID = mapExistFiles(filesID);
-    //auto mIndexes = m_pDatabase->GetWordsIndex(classes);
-    //T_LOG("class", "mIndexes size: %llu, classes: %s", mIndexes.size(), format_vector(classes).c_str());
-    //// add classes which is not exist
-    //std::vector<uint32_t> vClasses = this->AddClassImpl(classes);
-    //// add file to classes and classes to file
-    //for (auto cid: vClasses)
-    //{
-    //  this->AddClass2FileID(cid, existID);
-    //  this->AddFileID2Class(existID, cid);
-    //}
-    //// update file keywords for search
-    //for (auto fid : existID) {
-    //  for (auto& item : mIndexes) {
-    //    BindKeywordAndFile(item.second, fid);
-    //  }
-    //  SetSnapStep(fid, BIT_CLASS_OFFSET);
-    //}
-    //WRITE_END();
+    for (auto& val : classes) {
+      std::string gql = "{upset: '" TABLE_CLASS "', vertex: ['" + val + "']};";
+      execGQL(gql, nullptr);
+    }
+
+    for (FileID fid : filesID) {
+      std::string gqlClear = std::string("{remove: '") + TABLE_RELATION_CLASS + "', edge: [" + std::to_string(fid) + ", --, *]};";
+      execGQL(gqlClear, nullptr);
+
+      for (auto& val : classes) {
+        std::string gqlUpset = std::string("{upset: '") + TABLE_RELATION_CLASS + "', edge: [" + std::to_string(fid) + ", --, '" + val + "']};";
+        execGQL(gqlUpset, nullptr);
+      }
+    }
+
+    
+
     return true;
   }
 
   bool CivetStorage::AddClasses(const std::vector<std::string>& classes)
   {
     if (_flag == ReadOnly || classes.size() == 0) return false;
-    //WRITE_BEGIN();
-    //this->AddClassImpl(classes);
-    //WRITE_END();
+    
+    for (auto& cls : classes) {
+      std::string gql = "{upset: '" TABLE_CLASS "', vertex: ['" + cls + "']};";
+      execGQL(gql, nullptr);
+    }
     return true;
   }
 
   bool CivetStorage::AddMeta(const std::vector<FileID>& files, const nlohmann::json& meta)
   {
-    auto existFiles = mapExistFiles(files);
-    if (existFiles.size() == 0) return false;
     std::string name = meta["name"];
     std::string type = meta["type"];
-    T_LOG("file", "add meta type: %s, files: %s", type.c_str(), format_vector(existFiles).c_str());
-    //if (type == "bin") {
-    //  m_pDatabase->BeginBin();
-    //  auto pTable = m_pDatabase->GetOrCreateMetaTable(name, type);
-    //  std::string sBin = meta["value"];
-    //  T_LOG("file", "add bin data, len: %d", sBin.size());
-    //  pTable->Add(sBin, existFiles);
-    //  m_pDatabase->CommitBin();
-    //  return true;
-    //}
-    //WRITE_BEGIN();
-    //this->AddMetaImpl(existFiles, meta);
-    //WRITE_END();
+    for (FileID fid : files) {
+      std::string gql;
+      std::string value;
+      if (type == "bin") {
+        value = meta["value"];
+        gql = "{upset: '" TABLE_FILE "', property: [{'" + name + ":" + value + "'}], where: {id: " + std::to_string(fid) + "}};";
+      }
+      else {
+        value = meta["value"];
+        gql = "{upset: '" TABLE_FILE "', property: [{'" + name + ":" + value + "'}], where: {id: " + std::to_string(fid) + "}};";
+      }
+      execGQL(gql, nullptr);
+    }
     return true;
   }
 
   bool CivetStorage::RemoveFiles(const std::vector<FileID>& filesID)
   {
-    //WRITE_BEGIN();
-    ////auto existFiles = mapExistFiles(filesID);
-    //T_LOG("file", "exist files: %s", format_vector(filesID).c_str());
-    //for (auto fileID : filesID)
-    //{
-    //  T_LOG("file", "remove file id: %d", fileID);
-    //  RemoveFile(fileID);
-    //}
-    //WRITE_END();
+    for (auto fileID : filesID) {
+      std::string fid = std::to_string(fileID);
+      std::string gql = "{remove: '" TABLE_FILE "', vertex: [" + fid + "]};";
+      execGQL(gql, nullptr);
+      gql = "{remove: '" TABLE_RELATION_TAG "', edge: [" + fid + ", --, *]};";
+      execGQL(gql, nullptr);
+      gql = "{remove: '" TABLE_RELATION_CLASS "', edge: [" + fid + ", --, *]};";
+      execGQL(gql, nullptr);
+      gql = "{remove: '" TABLE_RELATION_KEYWORD "', edge: [" + fid + ", --, *]};";
+      execGQL(gql, nullptr);
+    }
     return true;
   }
 
   bool CivetStorage::RemoveTags(const std::vector<FileID>& filesID, const Tags& tags)
   {
-    /*WRITE_BEGIN();
-    auto mWordsIndex = m_pDatabase->GetWordsIndex(tags);
-    std::vector<WordIndex> vTags;
-    std::for_each(mWordsIndex.begin(), mWordsIndex.end(), [&vTags](const std::pair<std::string, WordIndex>& item) {
-      vTags.emplace_back(item.second);
-    });
-    void* pData = nullptr;
-    uint32_t len = 0;
-    for (auto fileID : filesID)
-    {
-      m_pDatabase->Get(TABLE_FILE2TAG, fileID, pData, len);
-      if (len) {
-        std::vector<WordIndex> vTagIdx((WordIndex*)pData, (WordIndex*)pData + len / sizeof(WordIndex));
-        eraseData(vTagIdx, vTags);
-        m_pDatabase->Put(TABLE_FILE2TAG, fileID, vTagIdx.data(), vTagIdx.size() * sizeof(WordIndex));
-        if (vTagIdx.size() == 0) {
-          SetSnapStep(fileID, BIT_TAG_OFFSET, false);
-        }
-      }
+    //auto mWordsIndex = m_pDatabase->GetWordsIndex(tags);
+    //std::vector<WordIndex> vTags;
+    //std::for_each(mWordsIndex.begin(), mWordsIndex.end(), [&vTags](const std::pair<std::string, WordIndex>& item) {
+    //  vTags.emplace_back(item.second);
+    //});
+    //void* pData = nullptr;
+    //uint32_t len = 0;
+    //for (auto fileID : filesID)
+    //{
+    //  m_pDatabase->Get(TABLE_FILE2TAG, fileID, pData, len);
+    //  if (len) {
+    //    std::vector<WordIndex> vTagIdx((WordIndex*)pData, (WordIndex*)pData + len / sizeof(WordIndex));
+    //    eraseData(vTagIdx, vTags);
+    //    m_pDatabase->Put(TABLE_FILE2TAG, fileID, vTagIdx.data(), vTagIdx.size() * sizeof(WordIndex));
+    //    if (vTagIdx.size() == 0) {
+    //      SetSnapStep(fileID, BIT_TAG_OFFSET, false);
+    //    }
+    //  }
+    //}
+    //for (auto tagID : vTags) {
+    //  m_pDatabase->Get(TABLE_TAG2FILE, tagID, pData, len);
+    //  if (len) {
+    //    std::vector<FileID> vFils((FileID*)pData, (FileID*)pData + len / sizeof(FileID));
+    //    eraseData(vFils, filesID);
+    //    m_pDatabase->Put(TABLE_TAG2FILE, tagID, vFils.data(), vFils.size() * sizeof(FileID));
+    //  }
+    //}
+    std::string sTags;
+    for (const std::string& tag : tags) {
+      sTags += "'" + tag + "',";
     }
-    for (auto tagID : vTags) {
-      m_pDatabase->Get(TABLE_TAG2FILE, tagID, pData, len);
-      if (len) {
-        std::vector<FileID> vFils((FileID*)pData, (FileID*)pData + len / sizeof(FileID));
-        eraseData(vFils, filesID);
-        m_pDatabase->Put(TABLE_TAG2FILE, tagID, vFils.data(), vFils.size() * sizeof(FileID));
-      }
+    sTags.pop_back();
+
+    for (FileID fid : filesID) {
+      std::string gql = "{remove: '" TABLE_RELATION_TAG "', where: [" + std::to_string(fid) + ", --, [" + sTags + "]]};";
+      execGQL(gql, nullptr);
     }
     RemoveKeywords(filesID, tags);
-    WRITE_END();*/
     return true;
   }
 
   bool CivetStorage::RemoveClasses(const std::vector<std::string>& classes)
   {
-    //WRITE_BEGIN();
+    for (auto& clsPath : classes) {
+      T_LOG("class", "remove class %s", clsPath.c_str());
+      std::string gql = "{remove: '" TABLE_CLASS "', where: {" TABLE_CLASS_TITLE ": '" + clsPath + "' } }; ";
+      execGQL(gql, nullptr);
+    }
 
-    //for (auto& clsPath : classes) {
-    //  T_LOG("class", "remove class %s", clsPath.c_str());
-    //  RemoveClassImpl(clsPath);
-    //}
-
-    //WRITE_END();
     return true;
   }
 
@@ -309,29 +331,21 @@ namespace caxios {
   bool CivetStorage::SetTags(const std::vector<FileID>& filesID, const std::vector<std::string>& tags)
   {
     if (_flag == ReadOnly) return false;
-    //WRITE_BEGIN();
-    //std::vector<FileID> existID = mapExistFiles(filesID);
-    //auto mIndexes = m_pDatabase->GetWordsIndex(tags);
-    //std::for_each(mIndexes.begin(), mIndexes.end(), [this, &existID](std::pair<std::string, WordIndex> item) {
-    //  AddTagPY(item.first, item.second);
-    //  AddFileID2Tag(existID, item.second);
-    //  T_LOG("tag", "files ID: %s, tag index: %d", format_vector(existID).c_str(), item.second);
-    //  for (FileID fileID : existID) {
-    //    this->AddFileID2Keyword(fileID, item.second);
-    //    this->AddKeyword2File(item.second, fileID);
-    //  }
-    //});
-    //for (auto fileID : existID) {
-    //  if (!IsFileExist(fileID)) continue;
-    //  std::vector<WordIndex> vTags;
-    //  // 不存在则添加
-    //  std::for_each(mIndexes.begin(), mIndexes.end(), [&vTags](std::pair<std::string, WordIndex> item) {
-    //    addUniqueDataAndSort(vTags, item.second);
-    //  });
-    //  m_pDatabase->Put(TABLE_FILE2TAG, fileID, vTags.data(), tags.size() * sizeof(WordIndex));
-    //  SetSnapStep(fileID, BIT_TAG_OFFSET);
-    //}
-    //WRITE_END();
+
+    for (const std::string& val : tags) {
+      std::string gql = "{upset: '" TABLE_TAG "', vertex: ['" + val + "']};";
+      execGQL(gql, nullptr);
+    }
+
+    for (FileID fid : filesID) {
+      std::string gqlClear = std::string("{remove: '") + TABLE_RELATION_TAG + "', edge: [" + std::to_string(fid) + ", --, *]};";
+      execGQL(gqlClear, nullptr);
+
+      for (const std::string& val : tags) {
+        std::string gqlUpset = std::string("{upset: '") + TABLE_RELATION_TAG + "', edge: [" + std::to_string(fid) + ", --, '" + val + "']};";
+        execGQL(gqlUpset, nullptr);
+      }
+    }
     return true;
   }
 
@@ -339,29 +353,17 @@ namespace caxios {
   {
     T_LOG("files", "fileid: %s", format_vector(filesID).c_str());
     //READ_BEGIN(TABLE_FILE_META);
-    //for (auto fileID: filesID)
-    //{
-    //  void* pData = nullptr;
-    //  uint32_t len = 0;
-    //  if (!m_pDatabase->Get(TABLE_FILE_META, fileID, pData, len)) {
-    //    T_LOG("files", "Get TABLE_FILE_META Fail: %d", fileID);
-    //    continue;
-    //  }
-    //  std::vector<uint8_t> sMeta((uint8_t*)pData, (uint8_t*)pData + len);
-    //  // std::string sDebug((char*)pData, 500 <len? 500: len);
-    //  // T_LOG("files", "meta: %s", sDebug.c_str());
-    //  using namespace nlohmann;
-    //  json meta = json::from_cbor(sMeta);
-    //  MetaItems items;
-    //  for (auto value: meta) {
-    //    MetaItem item;
-    //    for (auto it = value.begin(); it!=value.end();++it)
-    //    {
-    //      item[it.key()] = trunc(it.value().dump());
-    //      T_LOG("file", "file %d, get meta %s: %s", fileID, it.key().c_str(), it.value().dump().c_str());
-    //    }
-    //    items.emplace_back(item);
-    //  }
+    for (auto fileID: filesID)
+    {
+      std::list<IGQLExecutor*> tasks;
+      std::string gql = "{query: '" TABLE_FILE "', where: {id: " + std::to_string(fileID) + "}};";
+      tasks.push_back(new QueryExecutor(this, gql));
+      gql = "{query: '" TABLE_RELATION_TAG "', where: [" + std::to_string(fileID) + ", --, *]};";
+      tasks.push_back(new QueryExecutor(this, gql));
+      gql = "{query: '" TABLE_RELATION_KEYWORD "', where: [" + std::to_string(fileID) + ", --, *]};";
+      tasks.push_back(new QueryExecutor(this, gql));
+      gql = "{query: '" TABLE_RELATION_CLASS "', where: [" + std::to_string(fileID) + ", --, *]};";
+      tasks.push_back(new QueryExecutor(this, gql));
     //  // binary data
     //  if (_binTables.size() == 0) {
     //    InitBinaryTables();
@@ -409,7 +411,7 @@ namespace caxios {
     //  }
     //  FileInfo fileInfo{ fileID, items, tags, classes, {}, keywords };
     //  filesInfo.emplace_back(fileInfo);
-    //}
+    }
     return true;
   }
 
@@ -640,6 +642,8 @@ namespace caxios {
     //  tags[alphabet[0]] = vTags;
     //  return false;
     //});
+    std::string gql = "{query: '" TABLE_TAG "', from: '" GRAPH_NAME "'};";
+
     return true;
   }
 
@@ -651,8 +655,10 @@ namespace caxios {
 
   bool CivetStorage::UpdateClassName(const std::string& oldName, const std::string& newName)
   {
-    //std::vector<std::string> vWords = split(newName, '/');
-    //std::vector<std::string> vOldWords = split(oldName, '/');
+    std::vector<std::string> vWords = split(newName, '/');
+    std::vector<std::string> vOldWords = split(oldName, '/');
+
+
     //std::vector<std::string> names({ oldName, newName });
     //auto mIndexes = m_pDatabase->GetWordsIndex(names);
     //std::vector<WordIndex> vIndexes = transform(vWords, mIndexes);
@@ -844,14 +850,10 @@ namespace caxios {
       return true;
   }
 
-  bool CivetStorage::Insert(const std::string& sql) {
-    //RPN rpn(generate(sql));
-    return true;
-  }
-
-  bool CivetStorage::Remove(const std::string& sql) {
-    //RPN rpn(generate(sql));
-    return true;
+  void CivetStorage::CreateGQLTasks(const std::list<IGQLExecutor*>& task)
+  {
+    ClearTasks();
+    _executors = task;
   }
 
   void CivetStorage::TryUpdate(const std::string& meta)
@@ -864,145 +866,32 @@ namespace caxios {
 
   bool CivetStorage::AddFile(FileID fileid, const MetaItems& meta, const Keywords& keywords)
   {
-    //using namespace nlohmann;
-    ////json dbMeta;
-    ////dbMeta = meta;
-    ////std::string value = to_string(dbMeta);
-    ////T_LOG("file", "Write ID: %d, Meta Info: %s", fileid, value.c_str());
-    ////auto vData = json::to_cbor(dbMeta);
-    ////if (!m_pDatabase->Put(TABLE_FILE_META, fileid, (void*)(&vData[0]), vData.size())) {
-    ////  return false;
-    ////}
-    ////snap
-    //json snaps;
-    //for (MetaItem m: meta)
-    //{
-    //  if (m["name"] == "filename"){
-    //    snaps["value"] = m["value"];
-    //    break;
-    //  }
-    //}
-    //snaps["step"] = (char)0x1;
-    //// std::string sSnaps = to_string(snaps);
-    //auto sSnaps = json::to_cbor(snaps);
-    //if (!m_pDatabase->Put(TABLE_FILESNAP, fileid, (void*)(&sSnaps[0]), sSnaps.size())) {
-    //  T_LOG("file", "Put TABLE_FILESNAP Fail");
-    //  return false;
-    //}
-    //// T_LOG("file", "Write Snap: %s", sSnaps.c_str());
-    //// meta
-    //MetaItems cleanMeta;
-    //std::set<std::string> keyname;
-    //auto updateMeta = [](MetaItems& meta, MetaItem& item) {
-    //  for (auto ptr = meta.begin(); ptr != meta.end(); ++ptr)
-    //  {
-    //    if ((*ptr)["name"] == item["name"]) {
-    //      (*ptr)["value"] = item["value"];
-    //      break;
-    //    }
-    //  }
-    //};
-    //for (auto item : meta) {
-    //  if (item["value"].empty() || item["type"] == "undefined") continue;
-    //  auto itr = keyname.find(item["name"]);
-    //  if (itr != keyname.end()) {
-    //    updateMeta(cleanMeta, item);
-    //    continue;
-    //  }
-    //  cleanMeta.emplace_back(item);
-    //}
-    ////for (MetaItem m : meta) {
-    //  //nlohmann::json val = cleanMeta;
-    //  //T_LOG("file", "add meta %s", val.dump().c_str());
-    //  this->AddMetaImpl({ fileid }, cleanMeta);
-    //  //std::string& name = m["name"];
-    //  //auto pTable = m_pDatabase->GetMetaTable(name);
-    //  //if (!pTable) continue;
-    //  // T_LOG("file", "add meta(%s): %s, %d", name.c_str(), m["value"].c_str(), fileid);
-    //  //pTable->Add(m["value"], { fileid });
-    ////}
-    //// counts
-    //SetSnapStep(fileid, BIT_INIT_OFFSET);
-    // keyword
+    using namespace nlohmann;
+    json data;
+    for (MetaItem m : meta)
+    {
+      std::string key(m["name"]);
+      std::string value(m["value"]);
+      if (m["type"] == "int") {
+        data[key] = atoi(value.c_str());
+      }
+      else if (m["type"] == "date") {
+        size_t pos = value.find_first_of('.');
+        value = value.substr(0, pos);
+        data[key] = value;
+      }
+      else {
+        data[key] = value;
+      }
+    }
+    for (const std::string& kw : keywords) {
+      data["keyword"].push_back(kw);
+    }
+    std::string gql = json2gql(data);
+    gql = std::string("{upset: '") + TABLE_FILE + "', vertex: [[" + std::to_string(fileid) + ", " + gql + "]]};";
+    T_LOG("CivetStorage", "%s", gql.c_str());
+    execGQL(gql, nullptr);
     return true;
-  }
-
-  void CivetStorage::AddMetaImpl(const std::vector<FileID>& files, const nlohmann::json& meta)
-  {
-    // add meta to file
-    //void* pData = nullptr;
-    //uint32_t len = 0;
-    //for (FileID fid : files) {
-    //  m_pDatabase->Get(TABLE_FILE_META, fid, pData, len);
-    //  if (len == 0) {
-    //    // array
-    //    auto vData = nlohmann::json::to_cbor(meta);
-    //    m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
-    //    T_LOG("file", "add new resource, result[%d]: %s", fid, meta.dump().c_str());
-    //    continue;
-    //  }
-    //  else {
-    //    std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
-    //    nlohmann::json fileMeta = nlohmann::json::from_cbor(info);
-    //    if (meta.is_array()) {
-    //      auto upset = [&fileMeta](const std::string& key, const nlohmann::json& value) -> bool {
-    //        for (auto& origMeta : fileMeta) {
-    //          if (origMeta["name"] == key) {
-    //            origMeta["value"] = value;
-    //            return true;
-    //          }
-    //        }
-    //        return false;
-    //      };
-    //      for (auto& item : meta) {
-    //        if (!upset(item["name"], item["value"])) {
-    //          fileMeta.push_back(item);
-    //        }
-    //      }
-    //    }
-    //    else
-    //    {
-    //      fileMeta.push_back(meta);
-    //      //T_LOG("file", "add new meta, result: %s", meta.dump().c_str());
-    //    }
-    //    //T_LOG("file", "add new meta, finally: %s", fileMeta.dump().c_str());
-    //    auto vData = nlohmann::json::to_cbor(fileMeta);
-    //    m_pDatabase->Put(TABLE_FILE_META, fid, (void*)vData.data(), vData.size());
-    //  }
-    //}
-    //// add to meta table
-    //auto pushTable = [this](const std::vector<FileID>& files, const nlohmann::json& meta) {
-    //  std::string name = meta["name"];
-    //  std::string type = meta["type"];
-    //  bool isQuery = CanBeQuery(meta);
-    //  std::vector<std::string> vStr;
-    //  if (isQuery) {
-    //    if (meta["value"].is_array()) {
-    //      std::vector<std::string> vTmp = meta["value"];
-    //      vStr = vTmp;
-    //    }
-    //    else {
-    //      std::string vTmp = meta["value"];
-    //      vStr.emplace_back(vTmp);
-    //    }
-    //  }
-    //  if (isQuery) {
-    //    auto pTable = m_pDatabase->GetOrCreateMetaTable(name, type);
-    //    for (auto& val : vStr) {
-    //      pTable->Add(val, files);
-    //    }
-    //  }
-    //};
-    //if (meta.is_array()) {
-    //  //T_LOG("file", "add meta of array: %s", meta.dump().c_str());
-    //  for (auto& item: meta)
-    //  {
-    //    pushTable(files, item);
-    //  }
-    //}
-    //else {
-    //  pushTable(files, meta);
-    //}
   }
 
   bool CivetStorage::AddFileID2Tag(const std::vector<FileID>& vFilesID, WordIndex index)
@@ -1153,16 +1042,6 @@ namespace caxios {
     return true;
   }
 
-  void CivetStorage::MapHash2Class(uint32_t clsID, const std::string& name)
-  {
-    void* pData = nullptr;
-    //uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_HASH2CLASS, clsID, pData, len);
-    //if (len == 0) {
-    //  m_pDatabase->Put(TABLE_HASH2CLASS, clsID, (void*)name.data(), name.size());
-    //}
-  }
-
   std::vector<uint32_t> CivetStorage::AddClassImpl(const std::vector<std::string>& classes)
   {
     std::vector<uint32_t> vClasses;
@@ -1232,55 +1111,14 @@ namespace caxios {
     return std::move(vClasses);
   }
 
-  void CivetStorage::InitClass(const std::string& key, uint32_t curClass, uint32_t parent)
-  {
-    // add . and ..
-    std::vector<uint32_t> vCurrent({ curClass , parent });
-    //T_LOG("DEBUG", "TABLE_CLASS2HASH, key: %s, children: %s", format_x16(key).c_str(), format_vector(vCurrent).c_str());
-    //m_pDatabase->Put(TABLE_CLASS2HASH, key, vCurrent.data(), vCurrent.size() * sizeof(uint32_t));
-  }
-
   bool CivetStorage::RemoveFile(FileID fileID)
   {
     using namespace nlohmann;
-    //
-    //void* pData = nullptr;
-    //uint32_t len = 0;
-    //if (!m_pDatabase->Get(TABLE_FILE_META, fileID, pData, len)) {
-    //  T_LOG("file", "GET TABLE_FILE_META Fail %d", fileID);
-    //  return false;
-    //}
-    //if (len != 0) {
-    //  T_LOG("file", "meta size: %d", len);
-    //  std::vector<uint8_t> info((uint8_t*)pData, (uint8_t*)pData + len);
-    //  json meta = json::from_cbor(info);
-    //  T_LOG("file", "file meta(%d): %s", len, meta.dump().c_str());
-    //  // meta
-    //  for (json::iterator itr = meta.begin(); itr != meta.end(); ++itr) {
-    //    std::string name = (*itr)["name"];
-    //    auto pTable = m_pDatabase->GetMetaTable(name);
-    //    if (!pTable) continue;
-    //    auto value = (*itr)["value"];
-    //    if (value.is_array()) {
-    //      for (auto item : value) {
-    //        pTable->Delete(item, fileID);
-    //      }
-    //    }
-    //    else {
-    //      pTable->Delete(value, fileID);
-    //    }
-    //  }
-    //}
-    //// tag
-    //RemoveFile(fileID, TABLE_FILE2TAG, TABLE_TAG2FILE);
-    //// class
-    //RemoveFile(fileID, TABLE_FILE2CLASS, TABLE_CLASS2FILE);
-    //// snap
-    //m_pDatabase->Del(TABLE_FILESNAP, fileID);
-    //m_pDatabase->Del(TABLE_FILE_META, fileID);
-    //// TODO: keyword match files
-    //RemoveFileIDFromKeyword(fileID);
-    // TODO: 回收键值
+
+    std::string sID = std::to_string(fileID);
+    std::string gql = "{remove: '" TABLE_FILE "', where: {id: " + sID + "}};";
+
+    execGQL(gql, nullptr);
     return true;
   }
 
@@ -1395,56 +1233,16 @@ namespace caxios {
 
   bool CivetStorage::RemoveKeywords(const std::vector<FileID>& filesID, const std::vector<std::string>& keyword)
   {
-    /*auto mIndexes = m_pDatabase->GetWordsIndex(keyword);
-    std::vector<WordIndex> vWordsIndx;
-    std::for_each(mIndexes.begin(), mIndexes.end(), [&vWordsIndx](auto& item) {
-      vWordsIndx.emplace_back(item.second);
-    });
-    std::map<WordIndex, std::vector<FileID>> mRemovedFiles;
-    void* pData = nullptr;
-    uint32_t len = 0;
-    for (FileID fileID : filesID) {
-      m_pDatabase->Get(TABLE_FILE2KEYWORD, fileID, pData, len);
-      std::vector<WordRef> vWords((WordRef*)pData, (WordRef*)pData + len / sizeof(WordRef));
-      if (vWords.size() == 0) continue;
-      std::vector<WordIndex> removedWords = eraseData(vWords, vWordsIndx);
-      m_pDatabase->Put(TABLE_FILE2KEYWORD, fileID, vWords.data(), vWords.size() * sizeof(WordIndex));
-      for (auto indx: removedWords)
-      {
-        addUniqueDataAndSort(mRemovedFiles[indx], fileID);
-      }
+    std::string sKeyword;
+    for (const std::string& kw : keyword) {
+      sKeyword += "'" + kw + "',";
     }
-    for (auto& item : mRemovedFiles)
-    {
-      m_pDatabase->Get(TABLE_KEYWORD2FILE, item.first, pData, len);
-      if (len) {
-        std::vector<FileID> vFsID((FileID*)pData, (FileID*)pData + len / sizeof(FileID));
-        eraseData(vFsID, item.second);
-        m_pDatabase->Put(TABLE_KEYWORD2FILE, item.first, vFsID.data(), vFsID.size() * sizeof(FileID));
-      }
-    }*/
-    return true;
-  }
+    sKeyword.pop_back();
 
-  bool CivetStorage::RemoveFileIDFromKeyword(FileID fileID)
-  {
-    void* pData = nullptr;
-    uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_FILE2KEYWORD, fileID, pData, len);
-    //if (len) {
-    //  std::vector<WordRef> vIndexes((WordRef*)pData, (WordRef*)pData + len/sizeof(WordRef));
-    //  T_LOG("file", "indexes count: %u", vIndexes.size());
-    //  for (auto ref: vIndexes)
-    //  {
-    //    m_pDatabase->Get(TABLE_KEYWORD2FILE, word_policy<WordRef>::id(ref), pData, len);
-    //    if (len) {
-    //      std::vector<FileID> vFilesID((FileID*)pData, (FileID*)pData + len / sizeof(FileID));
-    //      eraseData(vFilesID, fileID);
-    //      T_LOG("file", "remove %d result: %s", fileID, format_vector(vFilesID).c_str());
-    //      m_pDatabase->Put(TABLE_KEYWORD2FILE, word_policy<WordRef>::id(ref), vFilesID.data(), vFilesID.size() * sizeof(FileID));
-    //    }
-    //  }
-    //}
+    for (FileID fid : filesID) {
+      std::string gql = "{remove: '" TABLE_RELATION_KEYWORD "', where: [" + std::to_string(fid) + ", --, [" + sKeyword + "]]};";
+      execGQL(gql, nullptr);
+    }
     return true;
   }
 
@@ -1609,20 +1407,6 @@ namespace caxios {
     return vFilesID;
   }
 
-  std::vector<caxios::FileID> CivetStorage::mapExistFiles(const std::vector<FileID>& filesID)
-  {
-    std::vector<caxios::FileID> vFiles;
-    //for (auto fileID : filesID) {
-    //  void* pData = nullptr;
-    //  uint32_t len = 0;
-    //  m_pDatabase->Get(TABLE_FILE_META, fileID, pData, len);
-    //  if (len) {
-    //    vFiles.emplace_back(fileID);
-    //  }
-    //}
-    return std::move(vFiles);
-  }
-
   nlohmann::json CivetStorage::ParseMeta(const std::string& meta)
   {
     nlohmann::json jsn = nlohmann::json::parse(meta);
@@ -1631,9 +1415,10 @@ namespace caxios {
     for (auto item : jsn)
     {
       //T_LOG("query", "schema item: %s", item.dump().c_str());
+      std::string name = trunc(item["name"].dump());
+      group[TABLE_FILE].push_back(name);
       if (item["query"] == true) {
-        std::string name = trunc(item["name"].dump());
-        group[TABLE_FILE].push_back(name);
+        group["index"].push_back(name);
       }
     }
     T_LOG("construct", "schema: %s", meta.c_str());
@@ -1711,6 +1496,14 @@ namespace caxios {
     //  vFilesID.emplace_back(filesID);
     //}
     return std::move(vFilesID);
+  }
+
+  void CivetStorage::ClearTasks()
+  {
+    for (auto ptr : _executors) {
+      delete ptr;
+    }
+    _executors.clear();
   }
 
 }

@@ -10,13 +10,31 @@
 
 namespace caxios {
 
+  int gqlite_callback_func(gqlite_result* result, void* handle);
+
+  struct ResultSet {
+    gqlite_result* _result;
+  };
+
+  //
+  class IGQLExecutor {
+  public:
+    virtual bool execute() = 0;
+    virtual const ResultSet& get() const = 0;
+
+    friend int gqlite_callback_func(gqlite_result* result, void* handle);
+  protected:
+    ResultSet _rs;
+  };
+
   class CivetStorage {
   public:
     CivetStorage(const std::string& dbdir, int flag, const std::string& meta = "");
     ~CivetStorage();
 
     std::vector<FileID> GenerateNextFilesID(int cnt = 1);
-    bool AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>&);
+    //bool AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>&);
+    bool AddFile(FileID, const MetaItems&, const Keywords&);
     bool AddClasses(const std::vector<std::string>& classes);
     bool AddClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID);
     bool AddMeta(const std::vector<FileID>& files, const nlohmann::json& meta);
@@ -42,12 +60,13 @@ namespace caxios {
     bool Insert(const std::string& sql);
     bool Remove(const std::string& sql);
 
+    void CreateGQLTasks(const std::list<IGQLExecutor*>& task);
+
   private:
     //void InitDB(CStorageProxy*& pDB, const char* dir, size_t size);
     void InitTable(const std::string& meta);
     void InitMap();
     void TryUpdate(const std::string& meta);
-    bool AddFile(FileID, const MetaItems&, const Keywords&);
     void AddMetaImpl(const std::vector<FileID>& files, const nlohmann::json& meta);
     //bool AddBinMeta(FileID, )
     bool AddFileID2Tag(const std::vector<FileID>&, WordIndex);
@@ -95,12 +114,14 @@ namespace caxios {
 
     std::vector<std::vector<FileID>> GetFilesIDByTagIndex(const WordIndex* const wordsIndx, size_t cnt);
 
+    void ClearTasks();
   private:
-    void execGQL(const std::string& gql);
+    void execGQL(const std::string& gql, IGQLExecutor* executor);
   private:
     std::vector<std::string> _binTables;
     DBFlag _flag = ReadWrite;
     gqlite* _pHandle = nullptr;
+    std::list<IGQLExecutor*> _executors;
   };
   
 }

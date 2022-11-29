@@ -24,7 +24,19 @@ namespace caxios {
 
   bool CivetKernel::AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>& files)
   {
-    return m_pStorage->AddFiles(files);
+    for (auto& file : files) {
+      if (m_pStorage->AddFile(std::get<0>(file), std::get<1>(file), std::get<2>(file))) {
+        // add link file
+      }
+      else {
+        MetaItems meta = std::get<1>(file);
+        for (auto item : meta) {
+        }
+        T_LOG("CivetKernel", "AddFile fail");
+        return false;
+      }
+    }
+    return true;
   }
 
   bool CivetKernel::AddClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID)
@@ -37,7 +49,7 @@ namespace caxios {
     return m_pStorage->AddClasses(classes);
   }
 
-  bool CivetKernel::AddMeta(const std::vector<FileID>& files, const nlohmann::json& meta)
+  bool CivetKernel::UpsetMeta(const std::vector<FileID>& files, const nlohmann::json& meta)
   {
     return m_pStorage->AddMeta(files, meta);
   }
