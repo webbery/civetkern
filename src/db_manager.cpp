@@ -205,19 +205,24 @@ namespace caxios {
 
   bool CivetStorage::AddMeta(const std::vector<FileID>& files, const nlohmann::json& meta)
   {
-    std::string name = meta["name"];
-    std::string type = meta["type"];
+    std::string name, type;
+    std::string value;
+    if (meta.size() == 1) {
+      auto item = meta.begin();
+      name = item.key();
+      value = caxios::normalize(item.value().dump());
+    } else {
+      name = meta["name"];
+      type = meta["type"];
+      if (type == "color") {
+        value = caxios::normalize(meta["value"].dump());
+      } else {
+        value = meta["value"];
+      }
+    }
     for (FileID fid : files) {
-      std::string gql;
-      std::string value;
-      if (type == "bin") {
-        value = meta["value"];
-        gql = "{upset: '" TABLE_FILE "', property: [{'" + name + ":" + value + "'}], where: {id: " + std::to_string(fid) + "}};";
-      }
-      else {
-        value = meta["value"];
-        gql = "{upset: '" TABLE_FILE "', property: [{'" + name + ":" + value + "'}], where: {id: " + std::to_string(fid) + "}};";
-      }
+      std::string gql = "{upset: '" TABLE_FILE "', property: [{" + name + ":" + value + "}], where: {id: " + std::to_string(fid) + "}};";
+      printf("upset: %s\n", gql.c_str());
       execGQL(gql, nullptr);
     }
     return true;
