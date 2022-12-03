@@ -128,11 +128,12 @@ namespace caxios {
     std::string groupTag = "{" TABLE_TAG ": 'name' }";
     std::string groupClass = "{" TABLE_CLASS ": '" TABLE_CLASS_TITLE "' }";
     std::string groupKeyword = "{" TABLE_KEYWORD ": 'name' }";
+    std::string groupSnap = "{" TABLE_FILESNAP ": ['fid', 'name', 'step'] }";
     std::string tagRelation = "['" TABLE_FILE "','" TABLE_RELATION_TAG "', '" TABLE_TAG "']";
     std::string clsRelation = "['" TABLE_FILE "', '" TABLE_RELATION_CLASS "', '" TABLE_CLASS "']";
     std::string keyordRelation = "['" TABLE_FILE "', '" TABLE_RELATION_KEYWORD "', '" TABLE_KEYWORD "']";
     std::string gql = std::string("{create: '" GRAPH_NAME "', group: [") + group.dump()
-      + ", " + groupTag + ", " + groupClass + ", " + groupKeyword
+      + ", " + groupTag + ", " + groupClass + ", " + groupKeyword + ", " + groupSnap
       + ", " + tagRelation + ", " + clsRelation + ", " + keyordRelation
       + "]};";
     /*
@@ -349,18 +350,21 @@ namespace caxios {
         if (result->count == 0) return;
 
         gqlite_vertex* node = result->nodes->_vertex;
-        nlohmann::json meta(node->properties);
+        nlohmann::json meta = nlohmann::json::parse(node->properties);
         T_LOG("files", "properties: %s", node->properties);
 
-        MetaItem item;
-        item["name"] = meta["filename"];
-        if (meta.count("bin")) {}
-        item["type"] = meta["type"];
-        item["height"] = meta["height"];
-        item["width"] = meta["width"];
-        item["size"] = meta["size"];
-        item["path"] = meta["path"];
-        items.emplace_back(item);
+        for (auto obj: meta.items()) {
+          MetaItem item;
+          item["name"] = obj.key();
+          if (obj.value().is_number()) {
+            item["type"] = "num";
+            item["value"] = std::to_string((long)obj.value());
+          } else {
+            item["type"] = "str";
+            item["value"] = obj.value();
+          }
+          items.emplace_back(item);
+        }
         });
 
       Tags tags;
@@ -433,13 +437,18 @@ namespace caxios {
 
   bool CivetStorage::GetFilesSnap(std::vector< Snap >& snaps)
   {
-    //READ_BEGIN(TABLE_FILESNAP);
-    //m_pDatabase->Filter(TABLE_FILESNAP, [&snaps](uint32_t k, void* pData, uint32_t len, void*& newVal, uint32_t& newLen) -> bool {
-    //  if (k == 0) return false;
-    //  using namespace nlohmann;
-    //  std::vector<uint8_t> js((uint8_t*)pData, (uint8_t*)pData + len);
-    //  json file=json::from_cbor(js);
-    //  try {
+    std::string gql = "{query: '" TABLE_FILESNAP "', in: '" GRAPH_NAME "'};";
+    execGQL(gql, [&](gqlite_result* result) {
+      gqlite_node* node = result->nodes;
+      while (node) {
+        gqlite_vertex* vertex = node->_vertex;
+        nlohmann::json meta = nlohmann::json::parse(vertex->properties);
+        Snap snap{vertex->uid , meta["name"], 1 };
+        snaps.emplace_back(snap);
+        node = node->_next;
+      }
+    });
+
     //    std::string display = trunc(to_string(file["value"]));
     //    std::string val = trunc(file["step"].dump());
     //    T_LOG("snap", "File step: %s", val.c_str());
@@ -449,9 +458,6 @@ namespace caxios {
     //    snaps.emplace_back(snap);
     //  }catch(json::exception& e){
     //    T_LOG("snap", "ERR: %s", e.what());
-    //  }
-    //  return false;
-    //});
     return true;
   }
 
@@ -481,30 +487,30 @@ namespace caxios {
 
   bool CivetStorage::GetUntagFiles(std::vector<FileID>& filesID)
   {
-    //std::vector<Snap> vSnaps;
-    //if (!GetFilesSnap(vSnaps)) return false;
-    //T_LOG("tag", "File Snaps: %llu", vSnaps.size());
-    //for (auto& snap : vSnaps) {
-    //  char bits = std::get<2>(snap);
-    //  T_LOG("tag", "untag file %d: %d", std::get<0>(snap), bits);
-    //  if (!(bits & BIT_TAG)) {
-    //    filesID.emplace_back(std::get<0>(snap));
-    //  }
-    //}
+    std::vector<Snap> vSnaps;
+    if (!GetFilesSnap(vSnaps)) return false;
+    T_LOG("tag", "File Snaps: %llu", vSnaps.size());
+    for (auto& snap : vSnaps) {
+      char bits = std::get<2>(snap);
+      T_LOG("tag", "untag file %d: %d", std::get<0>(snap), bits);
+      if (!(bits & BIT_TAG)) {
+        filesID.emplace_back(std::get<0>(snap));
+      }
+    }
     return true;
   }
 
   bool CivetStorage::GetUnClassifyFiles(std::vector<FileID>& filesID)
   {
     std::vector<Snap> vSnaps;
-    //if (!GetFilesSnap(vSnaps)) return false;
-    //for (auto& snap : vSnaps) {
-    //  char bits = std::get<2>(snap);
-    //  T_LOG("class", "unclassify file %d: %d", std::get<0>(snap), bits);
-    //  if (!(bits & BIT_CLASS)) {
-    //    filesID.emplace_back(std::get<0>(snap));
-    //  }
-    //}
+    if (!GetFilesSnap(vSnaps)) return false;
+    for (auto& snap : vSnaps) {
+     char bits = std::get<2>(snap);
+     T_LOG("class", "unclassify file %d: %d", std::get<0>(snap), bits);
+     if (!(bits & BIT_CLASS)) {
+       filesID.emplace_back(std::get<0>(snap));
+     }
+    }
     return true;
   }
 
@@ -901,6 +907,11 @@ namespace caxios {
     gql = std::string("{upset: '") + TABLE_FILE + "', vertex: [[" + std::to_string(fileid) + ", " + gql + "]]};";
     T_LOG("CivetStorage", "%s", gql.c_str());
     execGQL(gql);
+
+    gql = std::string("{upset: '") + TABLE_FILESNAP + "', vertex: [["
+      + std::to_string(fileid) + ", {name: '" + std::string(data["filename"]) +"'}]]};";
+    execGQL(gql);
+
     return true;
   }
 
