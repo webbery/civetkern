@@ -3,6 +3,7 @@
 #include "json.hpp"
 #include <map>
 #include <list>
+#include <functional>
 #include "log.h"
 #include "gqlite.h"
 #include "datum_type.h"
@@ -10,8 +11,7 @@
 #define TABLE_FILEID        32    // "file_cur_id"
 
 namespace caxios {
-
-  int gqlite_callback_func(gqlite_result* result, void* handle);
+  class CivetStorage;
 
   struct ResultSet {
     gqlite_result* _result;
@@ -20,12 +20,9 @@ namespace caxios {
   //
   class IGQLExecutor {
   public:
-    virtual bool execute() = 0;
-    virtual const ResultSet& get() const = 0;
+    void operator()(gqlite_result* result);
 
     friend int gqlite_callback_func(gqlite_result* result, void* handle);
-  protected:
-    ResultSet _rs;
   };
 
   class CivetStorage {
@@ -60,8 +57,6 @@ namespace caxios {
     bool Query(const std::string& query, std::vector< FileInfo>& filesInfo);
     bool Insert(const std::string& sql);
     bool Remove(const std::string& sql);
-
-    void CreateGQLTasks(const std::list<IGQLExecutor*>& task);
 
   private:
     //void InitDB(CStorageProxy*& pDB, const char* dir, size_t size);
@@ -115,14 +110,13 @@ namespace caxios {
 
     std::vector<std::vector<FileID>> GetFilesIDByTagIndex(const WordIndex* const wordsIndx, size_t cnt);
 
-    void ClearTasks();
   private:
-    void execGQL(const std::string& gql, IGQLExecutor* executor);
+    void execGQL(const std::string& gql);
+    void execGQL(const std::string& gql, std::function<void(gqlite_result*)> func);
   private:
     std::vector<std::string> _binTables;
     DBFlag _flag = ReadWrite;
     gqlite* _pHandle = nullptr;
-    std::list<IGQLExecutor*> _executors;
   };
   
 }

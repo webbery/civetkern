@@ -59,7 +59,7 @@ namespace caxios {
         lastTimeStamp = curTimeStamp;
       }
       return ((curTimeStamp - TWEPOCH) << timestampShift)
-        | (inputID << sequenceBit)
+        | (uint64_t(inputID) << sequenceBit)
         | sequence;
     }
 
