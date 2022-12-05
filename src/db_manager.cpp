@@ -319,8 +319,6 @@ namespace caxios {
 
   bool CivetStorage::SetTags(const std::vector<FileID>& filesID, const std::vector<std::string>& tags)
   {
-    if (_flag == ReadOnly) return false;
-
     for (const std::string& val : tags) {
       std::string gql = "{upset: '" TABLE_TAG "', vertex: ['" + val + "']};";
       execGQL(gql);
@@ -334,6 +332,18 @@ namespace caxios {
         std::string gqlUpset = std::string("{upset: '") + TABLE_RELATION_TAG + "', edge: [" + std::to_string(fid) + ", --, '" + val + "']};";
         execGQL(gqlUpset);
       }
+
+      std::string gqlSnap = "{query: '" TABLE_FILESNAP "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(fid) + "}};";
+      
+      uint8_t stepBit = 0;
+      execGQL(gqlSnap, [&] (gqlite_result* result) {
+        printf("tag: %s\n", result->nodes->_vertex->properties);
+        nlohmann::json snap = nlohmann::json::parse(result->nodes->_vertex->properties);
+        stepBit = (uint8_t)snap["step"];
+        });
+      std::string gqlUpsetSnap = "{upset: '" TABLE_FILESNAP "', property: [{step: " + std::to_string(stepBit | BIT_TAG) + "}], where: {id: "
+        + std::to_string(fid) + "}};";
+      execGQL(gqlUpsetSnap);
     }
     return true;
   }
@@ -448,16 +458,6 @@ namespace caxios {
         node = node->_next;
       }
     });
-
-    //    std::string display = trunc(to_string(file["value"]));
-    //    std::string val = trunc(file["step"].dump());
-    //    T_LOG("snap", "File step: %s", val.c_str());
-    //    int step = std::stoi(val);
-    //    T_LOG("snap", "File step: %d, %s", step, val.c_str());
-    //    Snap snap{ k, display, step };
-    //    snaps.emplace_back(snap);
-    //  }catch(json::exception& e){
-    //    T_LOG("snap", "ERR: %s", e.what());
     return true;
   }
 
@@ -579,8 +579,12 @@ namespace caxios {
 
   bool CivetStorage::getClassesInfo(const std::string& parent, nlohmann::json& info)
   {
-    //READ_BEGIN(TABLE_CLASS2FILE);
-    //READ_BEGIN(TABLE_CLASS2HASH);
+    std::string gql = "{query: '" TABLE_RELATION_CLASS "', in: '" GRAPH_NAME "', where: ['" + parent + "', --, *]};";
+    nlohmann::json jCls;
+    execGQL(gql, [&](gqlite_result* result) {
+      jCls["type"] = "clz";
+      info.push_back(jCls);
+      });
     //std::map<uint32_t, std::vector<FileID>> vFiles;
     //uint32_t parentID = 0;
     //std::string parentKey(ROOT_CLASS_PATH);
@@ -909,7 +913,7 @@ namespace caxios {
     execGQL(gql);
 
     gql = std::string("{upset: '") + TABLE_FILESNAP + "', vertex: [["
-      + std::to_string(fileid) + ", {name: '" + std::string(data["filename"]) +"'}]]};";
+      + std::to_string(fileid) + ", {name: '" + std::string(data["filename"]) +"', step: 0}]]};";
     execGQL(gql);
 
     return true;
