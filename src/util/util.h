@@ -124,6 +124,7 @@ namespace caxios {
   std::wstring string2wstring(const std::string& str);
   std::string normalize(const std::string& gql);
   std::string json2gql(const nlohmann::json& input);
+  std::string base64_encode(const std::vector<uint8_t>& bin);
 }
 
 #endif

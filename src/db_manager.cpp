@@ -171,6 +171,18 @@ namespace caxios {
         std::string gqlUpset = std::string("{upset: '") + TABLE_RELATION_CLASS + "', edge: [" + std::to_string(fid) + ", --, '" + val + "']};";
         execGQL(gqlUpset);
       }
+
+      std::string gqlSnap = "{query: '" TABLE_FILESNAP "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(fid) + "}};";
+
+      uint8_t stepBit = 0;
+      execGQL(gqlSnap, [&](gqlite_result* result) {
+        nlohmann::json snap = nlohmann::json::parse(result->nodes->_vertex->properties);
+        stepBit = (uint8_t)snap["step"];
+        });
+
+      std::string gqlUpsetSnap = "{upset: '" TABLE_FILESNAP "', , property: [{step: " + std::to_string(stepBit | BIT_CLASS) + "}], where: {id: "
+        + std::to_string(fid) + "}};";
+      execGQL(gqlUpsetSnap);
     }
 
     return true;
@@ -194,13 +206,22 @@ namespace caxios {
     if (meta.size() == 1) {
       auto item = meta.begin();
       name = item.key();
-      value = caxios::normalize(item.value().dump());
+      if (type == "bin") {
+        value = caxios::base64_encode(meta["value"]);
+      }
+      else {
+        value = caxios::normalize(item.value().dump());
+      }
     } else {
       name = meta["name"];
       type = meta["type"];
       if (type == "color") {
         value = caxios::normalize(meta["value"].dump());
-      } else {
+      }
+      else if (type == "bin") {
+        value = caxios::base64_encode(meta["value"]);
+      }
+      else {
         value = meta["value"];
       }
     }
@@ -453,7 +474,9 @@ namespace caxios {
       while (node) {
         gqlite_vertex* vertex = node->_vertex;
         nlohmann::json meta = nlohmann::json::parse(vertex->properties);
-        Snap snap{vertex->uid , meta["name"], 1 };
+        int step = 0;
+        if (meta.count("step") != 0) step = (int)meta["step"];
+        Snap snap{vertex->uid , meta["name"], step };
         snaps.emplace_back(snap);
         node = node->_next;
       }
