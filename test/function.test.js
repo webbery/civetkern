@@ -1,5 +1,11 @@
 ﻿const {describe, it} = require('mocha')
 const {expect, assert} = require('chai')
+var fs = require('fs')
+var process = require('child_process')
+if (fs.existsSync('civet'))
+    process.execSync('rm civet*', {stdio: [this.stdin, this.stdout, this.stderr], encoding: 'buffer', cwd: '.'});
+// process.execSync('rm 图像库*', {stdio: [this.stdin, this.stdout, this.stderr], encoding: 'buffer', cwd: '.'});
+
 // for linux test
 const instance = require('../build/Release/civetkern')
 
@@ -168,7 +174,7 @@ describe('civetkern add test', function() {
     let result = instance.updateClassName('type1', '新分类2')
     expect(result).to.equal(true)
     let childClasses = instance.getClassesInfo('新分类2')
-    // console.info('1', childClasses)
+    console.info('1', childClasses)
     expect(childClasses).to.lengthOf(1)
     result = instance.addClasses(['新分类2/子类'])
     expect(result).to.equal(true)
@@ -209,7 +215,7 @@ describe('civetkern read only test', function() {
   it('get files info', function() {
     // console.info('file id', snaps[0])
     let filesInfo = instance.getFilesInfo([snaps[0].id])
-    // console.info(filesInfo)
+    console.info(filesInfo)
     expect(filesInfo).to.lengthOf(1)
     expect(filesInfo[0]['tag']).to.exist
     expect(filesInfo[0]['tag']).to.include('test')

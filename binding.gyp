@@ -8,7 +8,6 @@
         "src/interface.cpp",
         "src/db_manager.cpp",
         "src/log.cpp",
-        "src/DBThread.cpp",
         "src/upgrader.cpp",
         "src/FileLink.cpp",
         "src/civetkern.cpp" ],

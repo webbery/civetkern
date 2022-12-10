@@ -327,7 +327,6 @@ namespace caxios {
   std::string json2gql(const nlohmann::json& input)
   {
     std::string gql = input.dump();
-    // 主要任务: key去掉双引号, 连续\\ 转\, value中的双引号字符串改成单引号字符串 
     enum class Status {
       Start,
       Splash,
@@ -336,7 +335,7 @@ namespace caxios {
     Status previous = Status::End;
     int prevPos = 0;
     Status cur = Status::End;
-    for (int index = 0; index < gql.size(); ++index) {
+    for (size_t index = 0; index < gql.size(); ++index) {
       if (gql[index] == '"') {
         switch (previous) {
         case Status::Splash:
@@ -525,9 +524,9 @@ namespace caxios {
 
   Napi::Array Vector2Array(Napi::Env env, const std::vector<std::string>& vStr)
   {
-    int cnt = vStr.size();
+    size_t cnt = vStr.size();
     Napi::Array arr = Napi::Array::New(env, cnt);
-    for (unsigned int idx = 0; idx < cnt; ++idx) {
+    for (size_t idx = 0; idx < cnt; ++idx) {
       arr.Set(idx, vStr[idx]);
     }
     return arr;
@@ -625,7 +624,7 @@ namespace caxios {
       Napi::String v = Napi::String::New(env, arg.c_str());
       vArgs.emplace_back(v);
     }
-    auto result = function.As<Napi::Function>().Call(vArgs);
+    function.As<Napi::Function>().Call(vArgs);
   }
 
   std::wstring string2wstring(const std::string& str)

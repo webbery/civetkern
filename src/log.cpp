@@ -1,5 +1,4 @@
 #include "log.h"
-#include "lmdb/lmdb.h"
 #include <chrono>
 #include <ctime>
 #include <iostream>
@@ -30,15 +29,6 @@
 #define MAX_TRACE_SIZE  64
 
 namespace caxios {
-  std::string err2str(int err) {
-    if (err > 0) {
-      return strerror(err);
-    }
-    else {
-      //return gqlite_error(err);
-    }
-  }
-
   std::string get_file_name(const char* pathname) {
     std::string fullpath(pathname);
 #ifdef WIN32

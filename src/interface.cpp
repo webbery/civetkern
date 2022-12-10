@@ -1,6 +1,5 @@
 #include <node.h>
 #include "civetkern.h"
-#include "MessageType.h"
 #include "util/util.h"
 #include <iostream>
 #include <napi.h>
@@ -68,9 +67,9 @@ namespace caxios {
       obj.Set("id", std::get<0>(info));
       // meta
       auto& metaInfo = std::get<1>(info);
-      int metaCnt = metaInfo.size();
+      size_t metaCnt = metaInfo.size();
       Napi::Array meta = Napi::Array::New(env, metaCnt);
-      for (unsigned int idx = 0; idx < metaCnt; ++idx) {
+      for (size_t idx = 0; idx < metaCnt; ++idx) {
         Napi::Object prop = Napi::Object::New(env);
         const MetaItem& item = metaInfo[idx];
         auto ptr = item.find("type");
@@ -430,7 +429,7 @@ namespace caxios {
     auto filesID = AttrAsUint32Vector(obj, "id");
     auto props = obj.GetPropertyNames();
     nlohmann::json meta;
-    for (int idx = 1; idx<props.Length(); ++idx)
+    for (uint32_t idx = 1; idx<props.Length(); ++idx)
     {
       std::string key = props.Get(idx).As<Napi::String>();
       auto value = obj.Get(key);

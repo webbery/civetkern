@@ -22,5 +22,5 @@ if (os.platform() === "win32") {
     runCommand('git clone --recursive https://github.com/webbery/gqlite.git gqlite', '.')
   }
   runCommand('cmake -B gqlite/build -DCMAKE_BUILD_TYPE=Release -DGQLITE_BUILD_SHARED=TRUE -DGQLITE_BUILD_TEST=FALSE gqlite', '.')
-    runCommand('cmake --build gqlite/build --config Release', '.')
+  runCommand('cmake --build gqlite/build --config Release', '.')
 }
