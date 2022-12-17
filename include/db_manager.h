@@ -76,8 +76,8 @@ namespace caxios {
     bool AddTagPY(const std::string& tag, WordIndex indx);
     bool AddClass2FileID(uint32_t, const std::vector<FileID>& vFilesID);
     bool AddFileID2Class(const std::vector<FileID>&, uint32_t);
-    void MapHash2Class(uint32_t clsID, const std::string& name);
-    std::vector<uint32_t> AddClassImpl(const std::vector<std::string>& classes);
+    uint64_t GetClassID(const std::string& name);
+    std::vector<uint64_t> AddClassImpl(const std::vector<std::string>& classes);
     void InitClass(const std::string& key, uint32_t curClass, uint32_t parent);
     bool RemoveFile(FileID);
     void RemoveFile(FileID, const std::string& file2type, const std::string& type2file);
@@ -108,7 +108,7 @@ namespace caxios {
     bool InitBinaryTables();
     bool CanBeQuery(const nlohmann::json& meta);
 
-    std::vector<std::vector<FileID>> GetFilesIDByTagIndex(const WordIndex* const wordsIndx, size_t cnt);
+    std::vector<std::vector<FileID>> GetFilesIDByTag(const std::vector<std::string>& tags);
 
   private:
     void execGQL(const std::string& gql);

@@ -125,6 +125,8 @@ namespace caxios {
   std::string normalize(const std::string& gql);
   std::string json2gql(const nlohmann::json& input);
   std::string base64_encode(const std::vector<uint8_t>& bin);
+  std::vector<uint8_t> base64_decode(const std::string& base64);
+  uint64_t snowflake2(uint16_t inputID);
 }
 
 #endif

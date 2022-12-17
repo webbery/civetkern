@@ -42,26 +42,6 @@ namespace caxios {
       uint8_t* _ptr = nullptr;
     };
 
-    uint64_t snowflake2(uint16_t inputID) {
-      static constexpr long sequenceBit = 8;
-      static constexpr long inputBit = 16;
-      static constexpr long timestampShift = sequenceBit + inputBit;
-      static constexpr long TWEPOCH = 1420041600000;
-      thread_local long sequence = 0;
-      thread_local long sequenceMask = -1L ^ (-1L << sequenceBit);
-      thread_local auto lastTimeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-      auto curTimeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-      if (curTimeStamp == lastTimeStamp) {
-        sequence = (sequenceMask + 1) & sequenceMask;
-      }
-      else {
-        lastTimeStamp = curTimeStamp;
-      }
-      return ((curTimeStamp - TWEPOCH) << timestampShift)
-        | (uint64_t(inputID) << sequenceBit)
-        | sequence;
-    }
-
     Napi::Object FileInfo2Object(napi_env env, const FileInfo& info) {
       Napi::Object obj = Napi::Object::New(env);
       obj.Set("id", std::get<0>(info));

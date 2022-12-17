@@ -70,6 +70,51 @@ namespace caxios {
     return ret;
   }
 
+  std::vector<uint8_t> base64_decode(const std::string& base64) {
+    int in_len = strlen(base64.c_str());
+    int i = 0;
+    int j = 0;
+    int in_ = 0;
+    uint8_t char_array_4[4], char_array_3[3];
+    std::vector<uint8_t> ret;
+
+    while (in_len-- && (base64[in_] != '='))
+    {
+        char_array_4[i++] = base64[in_];
+        in_++;
+        if (i == 4)
+        {
+            for (i = 0; i < 4; i++)
+                char_array_4[i] = base64_chars.find(char_array_4[i]);
+
+            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; (i < 3); i++)
+                ret.push_back(char_array_3[i]);
+            i = 0;
+        }
+    }
+
+    if (i)
+    {
+        for (j = i; j < 4; j++)
+            char_array_4[j] = 0;
+
+        for (j = 0; j < 4; j++)
+            char_array_4[j] = base64_chars.find(char_array_4[j]);
+
+        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+        for (j = 0; (j < i - 1); j++)
+            ret.push_back(char_array_3[j]);
+    }
+
+    return ret;
+  }
   bool exist(const std::string& filepath) {
 #if defined(__APPLE__) || defined(__gnu_linux__) || defined(__linux__)
     if (access(filepath.c_str(), 0) != -1) return true;
@@ -632,5 +677,25 @@ namespace caxios {
     std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
     return conv.from_bytes(str);
     //std::locale::global(std::locale("Chinese-simplified"));
+  }
+
+  uint64_t snowflake2(uint16_t inputID) {
+    static constexpr long sequenceBit = 8;
+    static constexpr long inputBit = 16;
+    static constexpr long timestampShift = sequenceBit + inputBit;
+    static constexpr long TWEPOCH = 1420041600000;
+    thread_local long sequence = 0;
+    thread_local long sequenceMask = -1L ^ (-1L << sequenceBit);
+    thread_local auto lastTimeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    auto curTimeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    if (curTimeStamp == lastTimeStamp) {
+      sequence = (sequenceMask + 1) & sequenceMask;
+    }
+    else {
+      lastTimeStamp = curTimeStamp;
+    }
+    return ((curTimeStamp - TWEPOCH) << timestampShift)
+      | (uint64_t(inputID) << sequenceBit)
+      | sequence;
   }
 }
