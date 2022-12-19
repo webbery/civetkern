@@ -55,30 +55,17 @@ namespace caxios {
     TABLE_MATCH
   };
 
-    int gqlite_callback_func(gqlite_result* result, void* handle) {
-      if (result->errcode != ECode_Success) return result->errcode;
-      return false;
-    }
+  int gqlite_callback_func(gqlite_result* result, void* handle) {
+    if (result->errcode != ECode_Success) return result->errcode;
+    return false;
+  }
 
 
-    int gqlite_callback_query(gqlite_result* result, void* handle) {
-      if (result->errcode != ECode_Success) return result->errcode;
-      auto a = static_cast<std::function<void(gqlite_result*)>*>(handle);
-      (*a)(result);
-      return false;
-    }
-
-    namespace {
-
-    std::vector<WordIndex> transform(const std::vector<std::string>& words, std::map<std::string, WordIndex>& mIndexes) {
-      std::vector<WordIndex> vIndexes;
-      vIndexes.resize(words.size());
-      std::transform(words.begin(), words.end(), vIndexes.begin(), [&mIndexes](const std::string& word)->WordIndex {
-        return mIndexes[word];
-        });
-      return vIndexes;
-    }
-
+  int gqlite_callback_query(gqlite_result* result, void* handle) {
+    if (result->errcode != ECode_Success) return result->errcode;
+    auto a = static_cast<std::function<void(gqlite_result*)>*>(handle);
+    (*a)(result);
+    return false;
   }
 
   CivetStorage::CivetStorage(const std::string& dbdir, int flag, const std::string& meta/* = ""*/)
@@ -750,58 +737,35 @@ namespace caxios {
   bool CivetStorage::Query(const std::string& query, std::vector<FileInfo>& filesInfo)
   {
     nlohmann::json condition = nlohmann::json::parse(query);
-    std::string sCond;
+    std::set<FileID> sFilesID;
     if (condition.count("keyword")) {
 
     }
     if (condition.count("tag")) {
+      std::string tags = condition["tag"];
+      auto&& vTags = split(tags, ',');
+      tags = "";
+      for (auto tag: vTags) {
+        tags += tag + ",";
+      }
+      tags.pop_back();
 
+      auto tagsFileID = GetFilesIDByTag(vTags);
+      for (auto& vFileID: tagsFileID) {
+        sFilesID.insert(vFileID.begin(), vFileID.end());
+      }
     }
-    sCond = json2gql(condition);
-    std::string gql = "{query: '" TABLE_FILE "', in: '" GRAPH_NAME "', where: " + sCond + "};";
-    printf("query gql: %s\n", gql.c_str());
-    std::vector<FileID> filesID;
-    execGQL(gql, [&] (gqlite_result* result) {
-      filesID.push_back(result->nodes->_vertex->uid);
-      printf("search result: %lld\n", result->nodes->_vertex->uid);
-    });
-    //      T_LOG("query", "stack count: %d", sSymbol.size());
-    //      std::unique_ptr<ISymbol> pLeft = std::move(sSymbol.top());
-    //      T_LOG("query", "pop left value");
-    //      sSymbol.pop();
-    //      if (pLeft->symbolType() == Table) {
-    //        std::unique_ptr<ISymbol> pRight = std::move(sSymbol.top());
-    //        std::unique_ptr< ValueInstance > pValue = dynamic_unique_cast<ValueInstance>(std::move(pRight));
-    //        T_LOG("query", "pop right value");
-    //        sSymbol.pop();
-    //        std::unique_ptr<ITableProxy> pLeftValue = dynamic_unique_cast<ITableProxy>(std::move(pLeft));
-    //        auto result = caxios::Query(m_pDatabase, std::move(pExpr), std::move(pLeftValue), std::move(pValue));
-    //        T_LOG("query", "emplace table result");
-    //        sSymbol.emplace(std::move(result));
-    //      }
-    //      else { // And/Or
-    //        std::unique_ptr<ValueInstance> pResult = dynamic_unique_cast<ValueInstance>(std::move(pLeft));
-    //        while (sSymbol.size()!=0) { // pop all query result
-    //          std::unique_ptr<ISymbol> pSymbol = std::move(sSymbol.top());
-    //          sSymbol.pop();
-    //          std::unique_ptr< ValueInstance > pValue = dynamic_unique_cast<ValueInstance>(std::move(pSymbol));
-    //          if (pExpr->Value() == OP_And) pResult = caxios::Interset(std::move(pResult), std::move(pValue));
-    //        }
-    //        //auto result = caxios::Query(m_pDatabase, std::move(pExpr), std::move(pLeftValue), std::move(pArray));
-    //        T_LOG("query", "emplace result");
-    //        sSymbol.emplace(std::move(pResult));
-    //      }
-    //    }
-    //  }
-    //    break;
-    //  default:
-    //    break;
-    //  }
-    //}
-    //T_LOG("query", "result count: %d", sSymbol.size());
-    //if (sSymbol.size() == 0) return false;
-    //auto result = std::move(sSymbol.top());
-    //std::unique_ptr<ValueArray> array = dynamic_unique_cast<ValueArray>(std::move(result));
+
+    std::vector<FileID> filesID{sFilesID.begin(), sFilesID.end()};
+    // sCond = json2gql(condition);
+    // std::string gql = "{query: '" TABLE_FILE "', in: '" GRAPH_NAME "', where: " + sCond + "};";
+    // printf("query gql: %s\n", gql.c_str());
+    // std::vector<FileID> filesID;
+    // execGQL(gql, [&] (gqlite_result* result) {
+    //   filesID.push_back(result->nodes->_vertex->uid);
+    //   printf("search result: %lld\n", result->nodes->_vertex->uid);
+    // });
+
     return GetFilesInfo(filesID, filesInfo);
   }
 
@@ -850,120 +814,6 @@ namespace caxios {
       + std::to_string(fileid) + ", {name: '" + std::string(data["filename"]) +"', step: 1}]]};";
     execGQL(gql);
 
-    return true;
-  }
-
-  bool CivetStorage::AddFileID2Tag(const std::vector<FileID>& vFilesID, WordIndex index)
-  {
-    //void* pData = nullptr;
-    //uint32_t len = 0;
-    //std::vector<FileID> vID;
-    //m_pDatabase->Get(TABLE_TAG2FILE, index, pData, len);
-    //if (len) {
-    //  std::vector<FileID> vTemp((FileID*)pData, (FileID*)pData + len/sizeof(FileID));
-    //  addUniqueDataAndSort(vID, vTemp);
-    //}
-    //addUniqueDataAndSort(vID, vFilesID);
-    //m_pDatabase->Put(TABLE_TAG2FILE, index, (void*)vID.data(), vID.size() * sizeof(FileID));
-    return true;
-  }
-
-  bool CivetStorage::AddFileID2Keyword(FileID fileID, WordIndex keyword)
-  {
-    //void* pData = nullptr;
-    //uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_KEYWORD2FILE, keyword, pData, len);
-    //FileID* pIDs = (FileID*)pData;
-    //size_t cnt = len / sizeof(FileID);
-    //std::vector<FileID> vFilesID(pIDs, pIDs + cnt);
-    //if (addUniqueDataAndSort(vFilesID, fileID)) return true;
-    //T_LOG("keyword", "add fileID: %d, keyword: %d, current: %s", fileID, keyword, format_vector(vFilesID).c_str());
-    //if (!m_pDatabase->Put(TABLE_KEYWORD2FILE, keyword, &(vFilesID[0]), sizeof(FileID) * vFilesID.size())) return false;
-    return true;
-  }
-
-  void CivetStorage::UpdateChildrenClassName(const std::string& clssKey, const std::string& oldParentName, const std::string& newParentName,
-    const std::vector<std::string>& oldStrings, const std::vector<WordIndex>& vWordsIndex)
-  {
-    void* pData = nullptr;
-    uint32_t len = 0;
-    //auto children = GetClassChildren(clssKey);
-    //for (ClassID cid : children) {
-    //  m_pDatabase->Get(TABLE_HASH2CLASS, cid, pData, len);
-    //  if (len) {
-    //    std::string oldPath((char*)pData, (char*)pData + len);
-    //    std::string clsName = oldPath;
-    //    auto start = clsName.begin();
-    //    clsName.replace(start, start + oldParentName.size(), newParentName);
-    //    m_pDatabase->Put(TABLE_HASH2CLASS, cid, (void*)clsName.data(), clsName.size());
-    //    // Update hash key -> class
-    //    auto newKey = GetClassKey(cid);
-    //    T_LOG("class", "updated name %s(%d) %s,  len is %d", clsName.c_str(), cid, format_x16(newKey).c_str(), clsName.size());
-    //    UpdateChildrenClassName(oldPath, oldParentName, newParentName,oldStrings, vWordsIndex);
-    //    // bind class hash 2 key
-    //    auto oldKey = GetClassKey(oldPath);
-    //    m_pDatabase->Get(TABLE_CLASS2HASH, oldKey, pData, len);
-    //    m_pDatabase->Put(TABLE_CLASS2HASH, newKey, pData, len);
-    //    m_pDatabase->Del(TABLE_CLASS2HASH, oldKey);
-    //  }
-    //  m_pDatabase->Get(TABLE_CLASS2FILE, cid, pData, len);
-    //  std::vector<FileID> vFiles((FileID*)pData, (FileID*)pData + len / sizeof(FileID));
-    //  RemoveKeywords(vFiles, oldStrings);
-    //  BindKeywordAndFile(vWordsIndex, vFiles);
-    //}
-  }
-
-  bool CivetStorage::AddKeyword2File(WordIndex keyword, FileID fileID)
-  {
-    void* pData = nullptr;
-    uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_FILE2KEYWORD, fileID, pData, len);
-    //T_LOG("keyword", "add keyword Index: %d, len: %d", keyword, len);
-    //WordRef wref = { keyword , 1 };
-    //WordRef* pWords = (WordRef*)pData;
-    //size_t cnt = len / sizeof(WordRef);
-    //std::vector<WordRef> vWordIndx(pWords, pWords + cnt);
-    //if (addUniqueDataAndSort(vWordIndx, wref)) return true;
-    //T_LOG("keyword", "add keywords: %d, fileID: %d", keyword, fileID);
-    //if (!m_pDatabase->Put(TABLE_FILE2KEYWORD, fileID, &(vWordIndx[0]), sizeof(WordRef) * vWordIndx.size())) return false;
-    return true;
-  }
-
-  void CivetStorage::BindKeywordAndFile(WordIndex wid, FileID fid)
-  {
-      //this->AddKeyword2File(wid, fid);
-      //this->AddFileID2Keyword(fid, wid);
-  }
-
-  void CivetStorage::BindKeywordAndFile(const std::vector<WordIndex>& mIndexes, const std::vector<FileID>& existID)
-  {
-    //for (auto fid : existID) {
-    //  for (auto& item : mIndexes) {
-    //    BindKeywordAndFile(item, fid);
-    //  }
-    //}
-  }
-
-  bool CivetStorage::AddTagPY(const std::string& tag, WordIndex indx)
-  {
-    //T_LOG("tag", "input py: %s", tag.c_str());
-    //std::wstring wTag = string2wstring(tag);
-    //T_LOG("tag", "input wpy: %ls, %d", wTag.c_str(), wTag[0]);
-    //auto py = getLocaleAlphabet(wTag[0]);
-    //T_LOG("tag", "Pinyin: %ls -> %ls", wTag.c_str(), py[0].c_str());
-    //WRITE_BEGIN();
-    //std::set<WordIndex> sIndx;
-    //void* pData = nullptr;
-    //uint32_t len = 0;
-    //if (m_pDatabase->Get(TABLE_TAG_INDX, py[0], pData, len)) {
-    //  WordIndex* pWords = (WordIndex*)pData;
-    //  size_t cnt = len / sizeof(WordIndex);
-    //  sIndx = std::set<WordIndex>(pWords, pWords + cnt);
-    //}
-    //sIndx.insert(indx);
-    //std::vector< WordIndex> vIndx(sIndx.begin(), sIndx.end());
-    //m_pDatabase->Put(TABLE_TAG_INDX, py[0], vIndx.data(), vIndx.size() * sizeof(WordIndex));
-    //WRITE_END();
     return true;
   }
 
@@ -1187,10 +1037,9 @@ namespace caxios {
     return true;
   }
 
-  std::vector<caxios::FileID> CivetStorage::GetFilesByClass(const std::vector<WordIndex>& clazz)
+  std::vector<caxios::FileID> CivetStorage::GetFilesByClass(const std::vector<std::string>& clazz)
   {
     std::vector<caxios::FileID> vFilesID;
-    std::string sPath = serialize(clazz);
     //void* pData = nullptr;
     //uint32_t len = 0;
     //m_pDatabase->Get(TABLE_CLASS2FILE, sPath, pData, len);

@@ -30,7 +30,6 @@ namespace caxios {
     CivetStorage(const std::string& dbdir, int flag, const std::string& meta = "");
     ~CivetStorage();
 
-    std::vector<FileID> GenerateNextFilesID(int cnt = 1);
     //bool AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>&);
     bool AddFile(FileID, const MetaItems&, const Keywords&);
     bool AddClasses(const std::vector<std::string>& classes);
@@ -65,15 +64,6 @@ namespace caxios {
     void TryUpdate(const std::string& meta);
     void AddMetaImpl(const std::vector<FileID>& files, const nlohmann::json& meta);
     //bool AddBinMeta(FileID, )
-    bool AddFileID2Tag(const std::vector<FileID>&, WordIndex);
-    bool AddFileID2Keyword(FileID, WordIndex);
-    void UpdateChildrenClassName(
-      const std::string& clssKey, const std::string& oldarentName, const std::string& newParentName,
-      const std::vector<std::string>& oldStrings, const std::vector<WordIndex>& vWordsIndex);
-    bool AddKeyword2File(WordIndex, FileID);
-    void BindKeywordAndFile(WordIndex, FileID);
-    void BindKeywordAndFile(const std::vector<WordIndex>&, const std::vector<FileID>&);
-    bool AddTagPY(const std::string& tag, WordIndex indx);
     bool AddClass2FileID(uint32_t, const std::vector<FileID>& vFilesID);
     bool AddFileID2Class(const std::vector<FileID>&, uint32_t);
     uint64_t GetClassID(const std::string& name);
@@ -87,7 +77,7 @@ namespace caxios {
     bool RemoveFileIDFromKeyword(FileID fileID);
     bool GetFileInfo(FileID fileID, MetaItems& meta, Keywords& keywords, Tags& tags, Annotations& anno);
     bool GetFileTags(FileID fileID, Tags& tags);
-    std::vector<FileID> GetFilesByClass(const std::vector<WordIndex>& clazz);
+    std::vector<FileID> GetFilesByClass(const std::vector<std::string>& clazz);
     bool IsFileExist(FileID fileID);
     bool IsClassExist(const std::string& clazz);
     uint32_t GenerateClassHash(const std::string& clazz);
@@ -104,7 +94,6 @@ namespace caxios {
     void SetSnapStep(FileID fileID, int bit, bool set=true);
     char GetSnapStep(FileID fileID, nlohmann::json&);
     Snap GetFileSnap(FileID);
-    WordIndex GetWordIndex(const std::string& word);
     bool InitBinaryTables();
     bool CanBeQuery(const nlohmann::json& meta);
 

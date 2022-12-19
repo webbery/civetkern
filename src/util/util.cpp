@@ -195,43 +195,6 @@ namespace caxios {
     createDirectories(parentDir);
     MkDir(dir);
   }
-  
-  std::string serialize(const std::vector< std::vector<WordIndex> >& classes)
-  {
-    // len wordindexes len wordindexes ...
-    std::string s;
-    for (auto& v : classes) {
-      char len = v.size();
-      s.push_back(len);
-      std::string t = serialize(v);
-      for (auto itr = t.begin(); itr<t.end();++itr)
-      {
-        s.push_back(*itr);
-      }
-      //std::copy(t.begin(), t.end(), s.end());
-      T_LOG("util", "serialize %s(%d)", format_x16(t).c_str(), len);
-    }
-    return s;
-  }
-
-  void deserialize(const std::string& s, std::vector<WordIndex>& v)
-  {
-    for (size_t idx = 0; idx < s.size(); idx += 4) {
-      WordIndex wi = ((s[idx] >> 24) | (s[idx + 1] >> 16) | (s[idx + 2] >> 8) | s[idx + 3]);
-      T_LOG("util", "deserialize %s: %d", format_x16(s).c_str(), wi);
-      v.emplace_back(wi);
-    }
-  }
-
-  void deserialize(const std::string& s, std::vector< std::vector<WordIndex> >& v)
-  {
-    for (size_t idx = 0; idx < s.size();) {
-      char len = s[idx];
-      std::vector<WordIndex> wds = deserialize<std::vector<WordIndex>>(s.substr(idx + 1, len));
-      v.push_back(wds);
-      idx += len + 1;
-    }
-  }
 
   uint32_t encode(const std::string& str)
   {
@@ -247,23 +210,6 @@ namespace caxios {
   uint32_t createHash(uint32_t hs, uint32_t di) 
   {
     return (hs + di) % std::numeric_limits<uint32_t>::max();
-  }
-
-  bool eraseData(std::vector<WordRef>& vDest, WordIndex tgt)
-  {
-    for (auto itr = vDest.begin(); itr != vDest.end();) {
-      if (itr->_wid == tgt) {
-        itr->_ref -= 1;
-      }
-      if (itr->_ref == 0) {
-        itr = vDest.erase(itr);
-        return true;
-      }
-      else {
-        ++itr;
-      }
-    }
-    return false;
   }
 
   bool isDate(const std::string& input)
@@ -297,24 +243,6 @@ namespace caxios {
     // #FF
     char* p;
     return strtoul(input.substr(1).c_str(), &p, 16);
-  }
-
-  std::string serialize(const std::vector<WordIndex>& classes)
-  {
-    std::string s;
-    if (classes.size() == 0) return ROOT_CLASS_PATH;
-    for (const WordIndex& wi : classes) {
-      char c4 = wi & (CHAR_BIT_S << 24);
-      s.push_back(c4);
-      char c3 = wi & (CHAR_BIT_S << 16);
-      s.push_back(c3);
-      char c2 = wi & (CHAR_BIT_S << 8);
-      s.push_back(c2);
-      char c1 = wi & CHAR_BIT_S;
-      s.push_back(c1);
-    }
-    T_LOG("util", "serialize %s(%d, %d)", format_x16(s).c_str(), classes.size(), s.size());
-    return s;
   }
 
   std::string replace_all(const std::string& input, const std::string& origin, const std::string& newer)
@@ -455,9 +383,17 @@ namespace caxios {
     return obj.Get(attr).As<Napi::Number>().Uint32Value();
   }
 
+  uint64_t AttrAsUint64(Napi::Object obj, std::string attr) {
+    return obj.Get(attr).As<Napi::Number>().Int64Value();
+  }
+
   uint32_t AttrAsUint32(Napi::Object obj, unsigned int const attr)
   {
     return obj.Get(attr).As<Napi::Number>().Uint32Value();
+  }
+
+  uint64_t AttrAsUint64(Napi::Object obj, unsigned int const attr) {
+    return obj.Get(attr).As<Napi::Number>().Int64Value();
   }
 
   int32_t AttrAsInt32(Napi::Object obj, std::string attr)
@@ -516,6 +452,15 @@ namespace caxios {
     return vector;
   }
 
+  std::vector<uint64_t> AttrAsUint64Vector(Napi::Object obj, std::string attr) {
+    Napi::Array array = obj.Get(attr).As<Napi::Array>();
+    std::vector<uint64_t> vec(array.Length());
+    for (unsigned int i = 0; i < array.Length(); i++) {
+      vec[i] = AttrAsUint64(array, i);
+    }
+    return vec;
+  }
+
   std::vector<std::string> AttrAsStringVector(Napi::Object obj, std::string attr)
   {
     Napi::Array array = obj.Get(attr).As<Napi::Array>();
@@ -543,6 +488,15 @@ namespace caxios {
     std::vector< uint32_t > vec;
     ForeachArray(arr, [&vec](Napi::Value item) {
       uint32_t fid = item.As<Napi::Number>().Uint32Value();
+      vec.emplace_back(fid);
+    });
+    return std::move(vec);
+  }
+
+  std::vector<uint64_t> ArrayAsUint64Vector(Napi::Array arr) {
+    std::vector< uint64_t > vec;
+    ForeachArray(arr, [&vec](Napi::Value item) {
+      uint64_t fid = item.As<Napi::Number>().Int64Value();
       vec.emplace_back(fid);
     });
     return std::move(vec);
@@ -679,9 +633,9 @@ namespace caxios {
     //std::locale::global(std::locale("Chinese-simplified"));
   }
 
-  uint64_t snowflake2(uint16_t inputID) {
+  uint32_t snowflake2(uint8_t inputID) {
     static constexpr long sequenceBit = 8;
-    static constexpr long inputBit = 16;
+    static constexpr long inputBit = 8;
     static constexpr long timestampShift = sequenceBit + inputBit;
     static constexpr long TWEPOCH = 1420041600000;
     thread_local long sequence = 0;
@@ -695,7 +649,7 @@ namespace caxios {
       lastTimeStamp = curTimeStamp;
     }
     return ((curTimeStamp - TWEPOCH) << timestampShift)
-      | (uint64_t(inputID) << sequenceBit)
+      | (uint32_t(inputID) << sequenceBit)
       | sequence;
   }
 }

@@ -22,6 +22,8 @@ namespace caxios {
   std::string AttrAsStr(Napi::Object obj, unsigned int const attr);
   uint32_t AttrAsUint32(Napi::Object obj, std::string attr);
   uint32_t AttrAsUint32(Napi::Object obj, unsigned int const attr);
+  uint64_t AttrAsUint64(Napi::Object obj, std::string attr);
+  uint64_t AttrAsUint64(Napi::Object obj, unsigned int const attr);
   int32_t AttrAsInt32(Napi::Object obj, std::string attr);
   int32_t AttrAsInt32(Napi::Object obj, unsigned int const attr);
   double AttrAsDouble(Napi::Object obj, std::string attr);
@@ -31,9 +33,11 @@ namespace caxios {
   Napi::Object AttrAsObject(Napi::Object obj, std::string attr);
   std::vector<int32_t> AttrAsInt32Vector(Napi::Object obj, std::string attr);
   std::vector<uint32_t> AttrAsUint32Vector(Napi::Object obj, std::string attr);
+  std::vector<uint64_t> AttrAsUint64Vector(Napi::Object obj, std::string attr);
   std::vector<std::string> AttrAsStringVector(Napi::Object obj, std::string attr);
   Napi::Object FindObjectFromArray(Napi::Object obj, std::function<bool(Napi::Object)> func);
   std::vector<uint32_t> ArrayAsUint32Vector(Napi::Array arr);
+  std::vector<uint64_t> ArrayAsUint64Vector(Napi::Array arr);
   std::vector<std::string> ArrayAsStringVector(Napi::Array arr);
   std::string AttrAsBinary(Napi::Object obj, std::string attr);
   Napi::Array Vector2Array(Napi::Env env, const std::vector<std::string>& vStr);
@@ -60,11 +64,7 @@ namespace caxios {
   );
   bool exist(const std::string& filepath);
   bool replace(const std::string& oldpath, const std::string& newpath);
-  std::string serialize(const std::vector< std::vector<WordIndex> >& classes);
-  std::string serialize(const std::vector<WordIndex>& classes);
 
-  void deserialize(const std::string&, std::vector<WordIndex>&);
-  void deserialize(const std::string&, std::vector< std::vector<WordIndex> >&);
   template<typename Ret>
   Ret deserialize(const std::string& str) {
     Ret ret;
@@ -103,8 +103,6 @@ namespace caxios {
     return false;
   }
 
-  bool eraseData(std::vector<WordRef>& vDest, WordIndex tgt);
-
   template<typename T1, typename T2>
   std::vector<T2> eraseData(std::vector<T1>& vDest, const std::vector <T2>& tgt) {
     std::vector<T2> vRemoved;
@@ -126,7 +124,7 @@ namespace caxios {
   std::string json2gql(const nlohmann::json& input);
   std::string base64_encode(const std::vector<uint8_t>& bin);
   std::vector<uint8_t> base64_decode(const std::string& base64);
-  uint64_t snowflake2(uint16_t inputID);
+  uint32_t snowflake2(uint8_t inputID);
 }
 
 #endif

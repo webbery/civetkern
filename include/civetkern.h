@@ -13,7 +13,6 @@ namespace caxios{
     explicit CivetKernel(const std::string& str, int flag, const std::string& meta = "");
     ~CivetKernel();
 
-    std::vector<FileID> GenNextFilesID(int cnt = 1);
     bool AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>& files);
     bool AddClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID);
     bool AddClasses(const std::vector<std::string>& classes);

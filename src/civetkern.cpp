@@ -17,11 +17,6 @@ namespace caxios {
     }
   }
 
-  std::vector<FileID> CivetKernel::GenNextFilesID(int cnt)
-  {
-    return m_pStorage->GenerateNextFilesID(cnt);
-  }
-
   bool CivetKernel::AddFiles(const std::vector <std::tuple< FileID, MetaItems, Keywords >>& files)
   {
     for (auto& file : files) {

@@ -9,9 +9,8 @@ namespace caxios {
     ReadOnly
   };
 
-  typedef unsigned int FileID;
+  typedef uint32_t FileID;
   //struct 
-  typedef uint32_t WordIndex;
   typedef uint32_t ClassID;
   typedef std::map<std::string, std::string > MetaItem;
   typedef std::vector<MetaItem> MetaItems;
@@ -23,26 +22,4 @@ namespace caxios {
   typedef std::vector<std::string> Classes;
   typedef std::tuple<FileID, MetaItems, Tags, Classes, Annotations, Keywords> FileInfo;
 
-  struct WordRef{
-    WordIndex _wid;
-    uint8_t _ref;
-  };
-
-  template<typename T> struct word_policy;
-  template<> struct word_policy< WordIndex > {
-    static WordIndex id(const WordIndex& ref) { return ref; }
-  };
-  template<> struct word_policy< WordRef > {
-    static WordIndex id(const WordRef& ref) { return ref._wid; }
-  };
-  inline bool operator == (const WordRef& left, const WordRef& right) {
-    return left._wid == right._wid;
-  }
-  inline bool operator != (const WordRef& left, const WordRef& right) {
-    return left._wid != right._wid;
-  }
-
-  inline bool operator < (const WordRef& left, const WordRef& right) {
-    return left._wid < right._wid;
-  }
 }

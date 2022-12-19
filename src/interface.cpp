@@ -461,7 +461,7 @@ namespace caxios {
         std::vector< FileInfo > filesInfo;
         std::vector< FileID > filesID;
         ForeachArray(aFilesID, [&filesID](Napi::Value item) {
-          FileID fid = item.As<Napi::Number>().Uint32Value();
+          FileID fid = item.As<Napi::Number>().Int32Value();
           filesID.emplace_back(fid);
         });
         T_LOG("interface", "files info %s", format_vector(filesID).c_str());
