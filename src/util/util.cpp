@@ -293,8 +293,17 @@ namespace caxios {
 
     result = replace_all(result, "\\u0000", "");
     // convert datetime, array
-    std::regex patternDatetime("'(\\w+)':");
-    return std::regex_replace(result, patternDatetime, "$1:");
+    std::regex patternKey(R"('([\$]*\w+)':)");
+    result = std::regex_replace(result, patternKey, "$1:");
+    std::regex patternDatetime(R"((\^[0-9]+.[0-9]*|'[0-9]+-[0-9]+-[0-9]+T[0-9]+:[0-9]+:[0-9]+.[0-9]+Z'))");
+    std::smatch mrs;
+    if (std::regex_search(result, mrs, patternDatetime)) {
+      // std::cout<<"match:" << mrs[0] << ", "<< mrs[1] <<std::endl;
+      auto st = mrs.str(1);
+      time_t t = str2time(st.substr(1, st.size() - 2));
+      result = std::regex_replace(result, patternDatetime, "0d" + std::to_string(t));
+    }
+    return result;
   }
 
   std::string json2gql(const nlohmann::json& input)

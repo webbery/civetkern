@@ -62,7 +62,6 @@ namespace caxios {
     void InitTable(const std::string& meta);
     void InitMap();
     void TryUpdate(const std::string& meta);
-    void AddMetaImpl(const std::vector<FileID>& files, const nlohmann::json& meta);
     //bool AddBinMeta(FileID, )
     bool AddClass2FileID(uint32_t, const std::vector<FileID>& vFilesID);
     bool AddFileID2Class(const std::vector<FileID>&, uint32_t);
