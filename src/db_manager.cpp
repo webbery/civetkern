@@ -18,8 +18,8 @@
 #define TABLE_TAG           "tags"
 #define TABLE_CLASS         "classes"
 #define TABLE_RELATION_KEYWORD "kw_rel"
-#define TABLE_RELATION_CLASS_FILE "cls_rel_file"
-#define TABLE_RELATION_CLASS "cls_rel_cls"
+#define TABLE_RELATION_CLASS_FILE "cls_rel_file"  // file id -- cls id
+#define TABLE_RELATION_CLASS "cls_rel_cls"      // parent id -- child id
 #define TABLE_RELATION_TAG  "tag_rel"
 #define TABLE_CLASS_TITLE   "name"
 #define TABLE_COUNT         "count"         // about count of some statistic
@@ -142,8 +142,8 @@ namespace caxios {
       std::string gqlClear = std::string("{remove: '") + TABLE_RELATION_CLASS_FILE + "', edge: [" + std::to_string(fid) + ", --, *]};";
       execGQL(gqlClear);
 
-      for (auto& val : classesID) {
-        std::string gqlUpset = std::string("{upset: '") + TABLE_RELATION_CLASS_FILE + "', edge: [" + std::to_string(fid) + ", --, " + std::to_string(val) + "]};";
+      for (auto& clsID : classesID) {
+        std::string gqlUpset = std::string("{upset: '") + TABLE_RELATION_CLASS_FILE + "', edge: [" + std::to_string(fid) + ", --, " + std::to_string(clsID) + "]};";
         execGQL(gqlUpset);
       }
 
@@ -161,6 +161,7 @@ namespace caxios {
 
       for (auto& s: classes) {
         std::string gqlKeyword = "{upset: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, '" + s + "']};";
+        printf("upset keyword: %s", gqlKeyword.c_str());
         execGQL(gqlKeyword);
       }
     }
@@ -204,6 +205,7 @@ namespace caxios {
 
       if (name == "tag" || name == "keyword" || name == "class") {
         std::string gqlKeyword = "{upset: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, '" + value + "']};";
+        printf("upset keyword: %s", gqlKeyword.c_str());
         execGQL(gql);
       }
     }
@@ -298,15 +300,16 @@ namespace caxios {
     }
 
     for (FileID fid : filesID) {
-      std::string gqlClear = std::string("{remove: '") + TABLE_RELATION_TAG + "', edge: [" + std::to_string(fid) + ", --, *]};";
+      std::string gqlClear = "{remove: '" TABLE_RELATION_TAG "', edge: [" + std::to_string(fid) + ", --, *]};";
       execGQL(gqlClear);
 
       for (const std::string& val : tags) {
-        std::string gqlUpset = std::string("{upset: '") + TABLE_RELATION_TAG + "', edge: [" + std::to_string(fid) + ", --, '" + val + "']};";
+        std::string gqlUpset = "{upset: '" TABLE_RELATION_TAG "', edge: [" + std::to_string(fid) + ", --, '" + val + "']};";
         execGQL(gqlUpset);
 
         std::string gqlKeyword = "{upset: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, '" + val + "']};";
         execGQL(gqlKeyword);
+        // printf("upset keyword: %s\n", gqlKeyword.c_str());
       }
 
       std::string gqlSnap = "{query: '" TABLE_FILESNAP "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(fid) + "}};";
@@ -320,7 +323,24 @@ namespace caxios {
         + std::to_string(fid) + "}};";
       execGQL(gqlUpsetSnap);
     }
+
+    // std::string queryTest = "{query: '" TABLE_RELATION_TAG "', in: '" GRAPH_NAME "'};";
+    // execGQL(queryTest, [](gqlite_result* result) {
+    //   printf("relation tag: %lld -- %s\n", result->nodes->_edge->from->uid, result->nodes->_edge->to->cid);
+    // });
     return true;
+  }
+
+  std::string CivetStorage::GetClassInfo(ClassID clsID) {
+    std::string name;
+    std::string query = "{query: '" TABLE_CLASS "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(clsID) + "'}};";
+    execGQL(query, [&](gqlite_result* result) {
+      if (result->count == 0) return;
+      gqlite_vertex* vertex = result->nodes->_vertex;
+      nlohmann::json clsInfo = nlohmann::json::parse(vertex->properties);
+      name = clsInfo["name"];
+    });
+    return name;
   }
 
   bool CivetStorage::GetFilesInfo(const std::vector<FileID>& filesID, std::vector< FileInfo>& filesInfo)
@@ -376,13 +396,7 @@ namespace caxios {
       });
 
       for (uint64_t cid: classID) {
-        std::string query = "{query: '" TABLE_CLASS "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(cid) + "'}};";
-        execGQL(query, [&](gqlite_result* result) {
-          if (result->count == 0) return;
-          gqlite_vertex* vertex = result->nodes->_vertex;
-          nlohmann::json clsInfo = nlohmann::json::parse(vertex->properties);
-          classes.push_back(clsInfo["name"]);
-        });
+        classes.push_back(GetClassInfo(cid));
       }
 
       Keywords keywords;
@@ -535,26 +549,51 @@ namespace caxios {
   bool CivetStorage::getClassesInfo(const std::string& parent, nlohmann::json& info)
   {
     // 返回当前分类下的所有子分类以及文件
-    std::string gql;
     if (!parent.empty() && parent != "/") {
       uint64_t clsID = GetClassID(parent);
-      gql = "{query: '" TABLE_RELATION_CLASS_FILE "', in: '" GRAPH_NAME "', where: [" + std::to_string(clsID) + ", --, *]};";
-      nlohmann::json jCls;
-    } else {
-      gql = "{query: '" TABLE_CLASS "', in: '" GRAPH_NAME "', where: {pid: 0}};";
-      execGQL(gql, [&](gqlite_result* result) {
+      auto filesID = GetFilesOfClass(clsID);
+      // 获取当前根目录下的所有文件
+      for (auto fid: filesID) {
         nlohmann::json jFile;
-        jFile["id"] = result->nodes->_vertex->uid;
-      //  Snap snap = GetFileSnap(fid);
-      //  jFile["name"] = std::get<1>(snap);
-        printf("property: %s, id: %s\n", 
-          result->nodes->_vertex->properties,
-          result->nodes->_vertex->uid);
-        info.push_back(jFile);
-        });
+        jFile["id"] = fid;
+        Snap snap = GetFileSnap(fid);
+        jFile["name"] = std::get<1>(snap);
+        info.emplace_back(jFile);
+      }
+      // 获取对应的子目录
+      auto&& childrenCls = GetClassChildren(clsID);
+      for (auto clzID: childrenCls) {
+        nlohmann::json clz;
+        clz["id"] = clzID;
+        clz["name"] = GetClassInfo(clzID);
+        clz["count"] = GetFilesOfClass(clzID).size();
+        clz["type"] = "clz";
+        info.emplace_back(clz);
+      }
+    } else {
+      // 获取当前根目录下的所有文件
+      auto filesID = GetFilesOfClass(0);
+      for (auto fid: filesID) {
+        nlohmann::json jFile;
+        jFile["id"] = fid;
+        Snap snap = GetFileSnap(fid);
+        jFile["name"] = std::get<1>(snap);
+        info.emplace_back(jFile);
+      }
+      // 获取对应的子目录
+      auto&& childrenCls = GetClassChildren(0);
+      for (auto clzID: childrenCls) {
+        nlohmann::json clz;
+        clz["id"] = clzID;
+        // clz["name"] = classPath;
+        // clz["count"] = GetAllFileCountOfClass(clzID);
+        clz["type"] = "clz";
+        info.emplace_back(clz);
+      }
     }
 
-    printf("gql: %s\n", gql.c_str());
+      printf("input: %s, %s\n", parent.c_str(), info.dump().c_str());
+    // printf("input: %s\n\t%s\n", parent.c_str(), info.dump().c_str());
     
     //std::map<uint32_t, std::vector<FileID>> vFiles;
     //uint32_t parentID = 0;
@@ -673,13 +712,25 @@ namespace caxios {
 
   bool CivetStorage::UpdateClassName(const std::string& oldName, const std::string& newName)
   {
+    if (oldName == newName) return true;
     std::vector<std::string> vWords = split(newName, '/');
     std::vector<std::string> vOldWords = split(oldName, '/');
 
     if (vWords.size() == 1 && vOldWords.size() == 1) {
+      auto clsID = GetClassID(vOldWords[0]);
+      // 更新分类名
       std::string gql = "{upset: '" TABLE_CLASS "', property: {" TABLE_CLASS_TITLE ": '"
         + vWords[0] + "'}, where: {" TABLE_CLASS_TITLE ": '" + vOldWords[0] + "'}};";
       execGQL(gql);
+      // 更新关键词关联的文件id
+      auto filesID = GetFilesOfClass(clsID);
+      for (auto fid: filesID) {
+        gql = "{remove: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, '" + vOldWords[0] + "']};";
+        execGQL(gql);
+
+        gql = "{upset: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, '" + vWords[0] + "']};";
+        execGQL(gql);
+      }
     }
     return true;
   }
@@ -762,10 +813,16 @@ namespace caxios {
         vKeywords = split(kws, ',');
       }
       for (auto& word: vKeywords) {
-        std::string gql = "{query: '" TABLE_RELATION_KEYWORD "', in: '" GRAPH_NAME "', where: ['" + word + "', --, *]};";
+        if (word[0] != '\'') {
+          word = "'" + word + "'";
+        }
+        // std::string gql = "{query: '" TABLE_RELATION_KEYWORD "', in: '" GRAPH_NAME "', where: [" + word + ", --, *]};";
+        std::string gql = "{query: '" TABLE_RELATION_KEYWORD "', in: '" GRAPH_NAME "'};";
+        printf("keyword gql: %s\n", gql.c_str());
         execGQL(gql, [&](gqlite_result* result) {
           if (result->count == 0) return;
-          sFilesID.insert(result->nodes->_edge->to->uid);
+          sFilesID.insert(result->nodes->_edge->from->uid);
+          printf("keyword relation: %lld -- %s\n", result->nodes->_edge->from->uid, result->nodes->_edge->to->cid);
         });
       }
 
@@ -786,6 +843,8 @@ namespace caxios {
       }
       condition.erase("tag");
     }
+
+    // printf("rest condition: %s\n", condition.dump().c_str());
 
     std::string restCond;
     bool queryAll = false;
@@ -932,9 +991,10 @@ namespace caxios {
           parent += vClsToken[i];
         }
         parentID = GetClassID(parent);
+        printf("parent: %s, %s, %ld\n", cls.c_str(), parent.c_str(), parentID);
       }
       std::string gql = "{upset: '" TABLE_CLASS "', vertex: [[" + std::to_string(clsID) + ", {name: '" + cls + "', pid: " + std::to_string(parentID) + "}]]};";
-      printf("add class: %s, name: %s\n", gql.c_str(), cls.c_str());
+      printf("add class: %s\n", gql.c_str());
       execGQL(gql);
 
       gql = "{upset: '" TABLE_RELATION_CLASS "', edge: [" + std::to_string(parentID) + ", ->, " + std::to_string(clsID) + "]};";
@@ -1111,24 +1171,6 @@ namespace caxios {
     return std::move(vFilesID);
   }
 
-  bool CivetStorage::IsFileExist(FileID fileID)
-  {
-    void* pData = nullptr;
-    uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_FILESNAP, fileID, pData, len);
-    //if (len > 0) return true;
-    return false;
-  }
-
-  bool CivetStorage::IsClassExist(const std::string& clazz)
-  {
-    void* pData = nullptr;
-    uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_CLASS2HASH, clazz, pData, len);
-    //if (len == 0) return false;
-    return true;
-  }
-
   uint32_t CivetStorage::GetClassParent(const std::string& clazz)
   {
     void* pData = nullptr;
@@ -1137,36 +1179,23 @@ namespace caxios {
     return *((uint32_t*)pData+1);
   }
 
-  std::vector<ClassID> CivetStorage::GetClassChildren(const std::string& clazz)
+  std::vector<ClassID> CivetStorage::GetClassChildren(ClassID parentClsID)
   {
     std::vector<ClassID> vChildren;
-    //void* pData = nullptr;
-    //uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_CLASS2HASH, clazz, pData, len);
-    //size_t cnt = len / sizeof(ClassID);
-    //if (cnt > CHILD_START_OFFSET) {
-    //  T_LOG("class", "%s children count: %d", clazz.c_str(), cnt);
-    //  vChildren.assign((ClassID*)pData + CHILD_START_OFFSET, (ClassID*)pData + cnt);
-    //}
-    //T_LOG("class", "%s[%d] children: %s", clazz.c_str(), cnt, format_vector(vChildren).c_str());
-    return std::move(vChildren);
+    std::string gql = "{query: '" TABLE_RELATION_CLASS "', in: '" GRAPH_NAME "', where: [" + std::to_string(parentClsID) + ", ->, *]};";
+    execGQL(gql, [&](gqlite_result* result) {
+      vChildren.push_back(result->nodes->_edge->to->uid);
+    });
+    return vChildren;
   }
 
   std::vector<caxios::FileID> CivetStorage::GetFilesOfClass(uint32_t clsID)
   {
     std::vector<caxios::FileID> vFilesID;
-    //void* pData = nullptr;
-    //uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_CLASS2FILE, clsID, pData, len);
-    //for (size_t idx = 0; idx < len / sizeof(FileID); ++idx) {
-    //  FileID fid = *((FileID*)pData + idx);
-    //  vFilesID.push_back(fid);
-    //}
-    //m_pDatabase->Filter(TABLE_CLASS2FILE, [](uint32_t k, void* pData, uint32_t len, void*& newVal, uint32_t& newLen)->bool {
-    //  std::vector<FileID> vFiles((FileID*)pData,(FileID*)pData + len/sizeof(FileID));
-    //  T_LOG("class", "view result: %u, %s", k, format_vector(vFiles).c_str());
-    //  return false;
-    //  });
+    std::string gql = "{query: '" TABLE_RELATION_CLASS_FILE "', in: '" GRAPH_NAME "', where: [*, --, " + std::to_string(clsID) + "]};";
+    execGQL(gql, [&](gqlite_result* result) {
+      vFilesID.push_back(result->nodes->_edge->from->uid);
+    });
     return vFilesID;
   }
 
@@ -1191,27 +1220,27 @@ namespace caxios {
   Snap CivetStorage::GetFileSnap(FileID fileID)
   {
     Snap snap;
-    void* pData = nullptr;
-    uint32_t len = 0;
-    //m_pDatabase->Get(TABLE_FILESNAP, fileID, pData, len);
-    //if (len) {
-    //  std::vector<uint8_t> tmp((uint8_t*)pData, (uint8_t*)pData + len);
-    //  nlohmann::json jSnap = nlohmann::json::from_cbor(tmp);
-    //  std::get<2>(snap) = atoi(jSnap["step"].dump().c_str());
-    //  std::get<0>(snap) = fileID;
-    //  std::get<1>(snap) = trunc(jSnap["value"].dump());
-    //}
-    return std::move(snap);
+    std::string gql = "{query: '" TABLE_FILESNAP "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(fileID) + "}};";
+    execGQL(gql, [&](gqlite_result* result) {
+      gqlite_node* node = result->nodes;
+      gqlite_vertex* vertex = node->_vertex;
+      nlohmann::json meta = nlohmann::json::parse(vertex->properties);
+      int step = 0;
+      if (meta.count("step") != 0) step = (int)meta["step"];
+      snap = Snap{vertex->uid , meta["name"], step };
+    });
+    return snap;
   }
 
   std::vector<std::vector<FileID>> CivetStorage::GetFilesIDByTag(const std::vector<std::string>& tags)
   {
     std::vector<std::vector<FileID>> vFilesID;
     for (auto& tag: tags) {
+      // std::string gql = "{query: '" TABLE_RELATION_TAG "', in: '" GRAPH_NAME "'};";
       std::string gql = "{query: '" TABLE_RELATION_TAG "', in: '" GRAPH_NAME "', where: ['" + tag + "', --, *]};";
       std::vector<FileID> filesID;
       execGQL(gql, [&] (gqlite_result* result) {
-        filesID.push_back(result->nodes->_vertex->uid);
+        filesID.push_back(result->nodes->_edge->from->uid);
       });
       vFilesID.emplace_back(filesID);
     }

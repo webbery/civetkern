@@ -333,6 +333,7 @@ namespace caxios {
     }
     return Napi::Boolean::From(info.Env(), true);
   }
+  
   Napi::Value addClasses(const Napi::CallbackInfo& info) {
     if (g_pCivetKernel == nullptr) return Napi::Boolean::From(info.Env(), false);
     if (info[0].IsArray()) {
