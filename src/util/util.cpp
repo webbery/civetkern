@@ -242,7 +242,26 @@ namespace caxios {
   {
     // #FF
     char* p;
+    // printf("color: %s, %s\n", input.c_str(), input.substr(1).c_str());
     return strtoul(input.substr(1).c_str(), &p, 16);
+  }
+
+  std::vector<u_char> ul2color(uint32_t input) {
+    uint32_t bit = 0xFF;
+    std::vector<u_char> color;
+    int rgbIndex = 3;
+    if (input >= 0xFFFFFF00) {
+      rgbIndex = 4;
+    }
+    for (char i = 0; i < rgbIndex; ++i) {
+      color.insert(color.begin(), (input & bit) >> (i*8));
+      bit <<= 8;
+    }
+    
+    if (rgbIndex == 3) {
+      color.push_back(0);
+    }
+    return color;
   }
 
   std::string replace_all(const std::string& input, const std::string& origin, const std::string& newer)
@@ -302,6 +321,21 @@ namespace caxios {
       auto st = mrs.str(1);
       time_t t = str2time(st.substr(1, st.size() - 2));
       result = std::regex_replace(result, patternDatetime, "0d" + std::to_string(t));
+    }
+
+    std::smatch mrs2;
+    std::regex patternColor("'#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})'");
+    if (std::regex_search(result, mrs2, patternColor)) {
+      auto st = mrs2.str(1);
+      char* p;
+      auto c = strtoul(st.c_str(), &p, 16);
+      auto&& color = ul2color(c);
+      std::string sColor;
+      for (auto elem: color) {
+        sColor += std::to_string((int)elem) + ",";
+      }
+      sColor.pop_back();
+      result = std::regex_replace(result, patternColor, "[" + sColor + "]");
     }
     return result;
   }
