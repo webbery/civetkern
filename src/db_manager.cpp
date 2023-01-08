@@ -930,13 +930,17 @@ namespace caxios {
         value = "*";
       }
       
+      if (value.find("$near:") != std::string::npos) {
+        // 转换查询格式,颜色的笛卡尔距离<10
+        value = "{$near: {$geometry: " + item.value()["$near"].dump() + ", $lt: 20}}";
+      }
       restCond += "{" + std::string(item.key()) + ": " + value + "}";
       restCond += ",";
       if (value == "*") break;
     }
     if (restCond.size()) {
       restCond.pop_back();
-      // printf("rest condition: %s\n", restCond.c_str());
+      printf("rest condition: %s\n", restCond.c_str());
 
       std::string gql = "{query: '" TABLE_FILE "', in: '" GRAPH_NAME "'";
       
