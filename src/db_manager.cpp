@@ -34,9 +34,6 @@
 
 #define CHILD_START_OFFSET  2
 
-#define WRITE_BEGIN()  m_pDatabase->Begin()
-#define WRITE_END()    m_pDatabase->Commit()
-
 #define BIT_INIT_OFFSET  0
 #define BIT_TAG_OFFSET   1
 #define BIT_CLASS_OFFSET 2
@@ -64,7 +61,10 @@ namespace caxios {
 
 
   int gqlite_callback_query(gqlite_result* result, void* handle) {
-    if (result->errcode != ECode_Success) return result->errcode;
+    if (result->errcode != ECode_Success) {
+      printf("GQL ERROR: %s\n", result->infos[0]);
+      return result->errcode;
+    }
     auto a = static_cast<std::function<void(gqlite_result*)>*>(handle);
     (*a)(result);
     return false;
@@ -196,8 +196,11 @@ namespace caxios {
         std::vector<uint8_t> bin(s.begin(), s.end());
         value = "0b'" + caxios::base64_encode(bin) + "'";
       }
-      else {
+      else if (type == "date") {
         value = meta["value"];
+      }
+      else {
+        value = "'" + std::string(meta["value"]) + "'";
       }
     }
     for (FileID fid : files) {
@@ -206,7 +209,7 @@ namespace caxios {
       // printf("upset gql: %s\n", gql.c_str());
 
       if (name == "tag" || name == "keyword" || name == "class") {
-        std::string gqlKeyword = "{upset: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, '" + value + "']};";
+        std::string gqlKeyword = "{upset: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, " + value + "]};";
         execGQL(gql);
       }
     }
@@ -862,35 +865,39 @@ namespace caxios {
     nlohmann::json condition = nlohmann::json::parse(query);
     std::set<FileID> sFilesID;
 
-    if (condition.count("keyword")) {
-      auto keywords = condition["keyword"];
-      std::vector<std::string> vKeywords;
-      if (keywords.is_array()) {
-        vKeywords = keywords.get<std::vector<std::string>>();
+    auto getVectorData = [](const nlohmann::json& data) {
+      std::vector<std::string> ret;
+      // printf("dump: %s\n", data.dump().c_str());
+      if (data.is_array()) {
+        // printf("dump array\n");
+        ret = data.get<std::vector<std::string>>();
       } else {
-        std::string kws = normalize(condition["keyword"].dump());
-        vKeywords = split(kws, ',');
+        std::string word = normalize(data.dump());
+        ret = split(word, ',');
       }
+      return ret;
+    };
+    if (condition.count("keyword")) {
+      std::vector<std::string>&& vKeywords = getVectorData(condition["keyword"]);
       for (auto& word: vKeywords) {
         if (word[0] != '\'') {
           word = "'" + word + "'";
         }
-        // std::string gql = "{query: '" TABLE_RELATION_KEYWORD "', in: '" GRAPH_NAME "', where: [" + word + ", --, *]};";
-        std::string gql = "{query: '" TABLE_RELATION_KEYWORD "', in: '" GRAPH_NAME "'};";
-        printf("keyword gql: %s\n", gql.c_str());
+        std::string gql = "{query: '" TABLE_RELATION_KEYWORD "', in: '" GRAPH_NAME "', where: [" + word + ", --, *]};";
+        // std::string gql = "{query: '" TABLE_RELATION_KEYWORD "', in: '" GRAPH_NAME "'};";
+        // printf("keyword gql: %s\n", gql.c_str());
         execGQL(gql, [&](gqlite_result* result) {
           if (result->count == 0) return;
           sFilesID.insert(result->nodes->_edge->from->uid);
-          printf("keyword relation: %lld -- %s\n", result->nodes->_edge->from->uid, result->nodes->_edge->to->cid);
+          // printf("keyword relation: %lld -- %s\n", result->nodes->_edge->from->uid, result->nodes->_edge->to->cid);
         });
       }
 
       condition.erase("keyword");
     }
     if (condition.count("tag")) {
-      std::string tags = condition["tag"];
-      auto&& vTags = split(tags, ',');
-      tags = "";
+      std::vector<std::string>&& vTags = getVectorData(condition["tag"]);
+      std::string tags;
       for (auto tag: vTags) {
         tags += tag + ",";
       }
@@ -902,38 +909,53 @@ namespace caxios {
       }
       condition.erase("tag");
     }
-
-    // printf("rest condition: %s\n", condition.dump().c_str());
+    if (condition.count("class")) {
+      std::vector<std::string>&& vClasses = getVectorData(condition["class"]);
+      for (auto cls: vClasses) {
+        if (cls[0] == '\'') {
+          cls = cls.substr(1, cls.size() - 2);
+        }
+        auto clsID = GetClassID(cls);
+        auto&& filesID = GetFilesOfClass(clsID);
+        sFilesID.insert(filesID.begin(), filesID.end());
+      }
+      condition.erase("class");
+    }
 
     std::string restCond;
     bool queryAll = false;
     for (auto& item: condition.items()) {
       std::string value = normalize(item.value().dump());
       if (value == "'*'") {
-        restCond = "*,";
-        break;
+        value = "*";
       }
       
       restCond += "{" + std::string(item.key()) + ": " + value + "}";
       restCond += ",";
+      if (value == "*") break;
     }
     if (restCond.size()) {
       restCond.pop_back();
+      // printf("rest condition: %s\n", restCond.c_str());
 
       std::string gql = "{query: '" TABLE_FILE "', in: '" GRAPH_NAME "'";
       
-      if (!queryAll) {
-        gql += ", where: " + normalize(restCond);
-      }
+      gql += ", where: " + normalize(restCond);
       gql += "};";
 
       printf("query gql: %s\n", gql.c_str());
       execGQL(gql, [&](gqlite_result* result) {
+        // printf("query %s\n", result->nodes->_vertex->properties);
         sFilesID.insert(result->nodes->_vertex->uid);
       });
+      // printf("query end\n");
+      // execGQL("{query: 'file_meta', in: 'civet'};", [&](gqlite_result* result) {
+      //   printf("query result %s\n", result->nodes->_vertex->properties);
+      // });
     }
 
     std::vector<FileID> filesID{sFilesID.begin(), sFilesID.end()};
+    // printf("files: %ld\n", filesID.size());
     // sCond = json2gql(condition);
     // std::string gql = "{query: '" TABLE_FILE "', in: '" GRAPH_NAME "', where: " + sCond + "};";
     // printf("query gql: %s\n", gql.c_str());
@@ -967,7 +989,12 @@ namespace caxios {
       }
       else if (m["type"] == "date") {
         size_t pos = value.find_first_of('.');
-        value = value.substr(0, pos);
+        if (pos != std::string::npos) {
+          value = value.substr(0, pos);
+        }
+        if (value.size() > 10) {
+          value = value.substr(0, value.size() - 3);
+        }
         data[key] = value;
       }
       else {
@@ -977,12 +1004,13 @@ namespace caxios {
     for (const std::string& kw : keywords) {
       data["keyword"].push_back(kw);
     }
-    std::string gql = json2gql(data);
+    std::string gql = normalize(data.dump());
     if (gql == "null") {
       gql = std::string("{upset: '") + TABLE_FILE + "', vertex: [[" + std::to_string(fileid) + "]]};";
     }
     else {
       gql = std::string("{upset: '") + TABLE_FILE + "', vertex: [[" + std::to_string(fileid) + ", " + gql + "]]};";
+      // printf("add file: %s\n", gql.c_str());
     }
     T_LOG("CivetStorage", "%s", gql.c_str());
     execGQL(gql);
@@ -1271,7 +1299,7 @@ namespace caxios {
     std::vector<std::vector<FileID>> vFilesID;
     for (auto& tag: tags) {
       // std::string gql = "{query: '" TABLE_RELATION_TAG "', in: '" GRAPH_NAME "'};";
-      std::string gql = "{query: '" TABLE_RELATION_TAG "', in: '" GRAPH_NAME "', where: ['" + tag + "', --, *]};";
+      std::string gql = "{query: '" TABLE_RELATION_TAG "', in: '" GRAPH_NAME "', where: [" + tag + ", --, *]};";
       std::vector<FileID> filesID;
       execGQL(gql, [&] (gqlite_result* result) {
         filesID.push_back(result->nodes->_edge->from->uid);

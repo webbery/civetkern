@@ -235,7 +235,8 @@ namespace caxios {
     std::istringstream iss(input);
     std::tm stm = {};
     iss >> std::get_time(&stm, "%Y-%m-%dT%H:%M:%SZ");
-    return std::mktime(&stm)*1000 + milliSec;
+    return std::mktime(&stm);
+    // return std::mktime(&stm)*1000 + milliSec;
   }
 
   uint32_t str2color(const std::string& input)
@@ -275,6 +276,10 @@ namespace caxios {
     return data;
   }
 
+  std::string replace_strdate(const std::string& input) {
+
+  }
+
   std::string normalize(const std::string& gql)
   {
     std::string result(gql);
@@ -312,8 +317,9 @@ namespace caxios {
 
     result = replace_all(result, "\\u0000", "");
     // convert datetime, array
-    std::regex patternKey(R"('([\$]*\w+)':)");
-    result = std::regex_replace(result, patternKey, "$1:");
+    std::regex patternStrDate(R"('(0d\w+)')");
+    result = std::regex_replace(result, patternStrDate, "$1");
+
     std::regex patternDatetime(R"((\^[0-9]+.[0-9]*|'[0-9]+-[0-9]+-[0-9]+T[0-9]+:[0-9]+:[0-9]+.[0-9]+Z'))");
     std::smatch mrs;
     if (std::regex_search(result, mrs, patternDatetime)) {
@@ -337,6 +343,8 @@ namespace caxios {
       sColor.pop_back();
       result = std::regex_replace(result, patternColor, "[" + sColor + "]");
     }
+    std::regex patternKey(R"('([\$]*\w+)':)");
+    result = std::regex_replace(result, patternKey, "$1:");
     return result;
   }
 
