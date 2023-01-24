@@ -42,7 +42,6 @@
           '-fexceptions',
           '-Wall',
           '-mmacosx-version-min=10.15',
-          '-Wno-pessimizing-move'
           '-O3'
         ]
       },
@@ -101,7 +100,7 @@
         }],
         ['OS=="mac"', {
           "link_settings": {
-            # 'library_dirs': ['<!(pwd)/gqlite/build'],
+            'library_dirs': ['<!(pwd)/gqlite/build'],
             'libraries': [
               'libgqlite.dylib'
             ],
