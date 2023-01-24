@@ -101,14 +101,16 @@
         }],
         ['OS=="mac"', {
           "link_settings": {
-            'library_dirs': ['<!(pwd)/gqlite/build'],
+            # 'library_dirs': ['<!(pwd)/gqlite/build'],
             'libraries': [
               'libgqlite.dylib'
             ],
-            'ldflags': [
-              # Ensure runtime linking is relative to civetkern.node
-              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/build/Release\''
-            ]
+            'xcode_settings': {
+              'OTHER_LDFLAGS': [
+                # Ensure runtime linking is relative to civetkern.node
+                '-Wl,-rpath,\'@loader_path\''
+              ]
+            }
           }
         }]
       ]
