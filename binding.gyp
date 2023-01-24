@@ -101,9 +101,9 @@
         }],
         ['OS=="mac"', {
           "link_settings": {
-            'library_dirs': ['<!(pwd)/build/Release'],
+            'library_dirs': ['<!(pwd)/gqlite/build'],
             'libraries': [
-              '<!(pwd)/build/Release/libgqlite.dylib'
+              'libgqlite.dylib'
             ],
             'ldflags': [
               # Ensure runtime linking is relative to civetkern.node
