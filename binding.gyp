@@ -94,7 +94,7 @@
               '-lgqlite'
             ],
             'ldflags': [
-              # Ensure runtime linking is relative to sharp.node
+              # Ensure runtime linking is relative to civetkern.node
               '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
             ]
           }
@@ -103,10 +103,10 @@
           "link_settings": {
             'library_dirs': ['<!(pwd)/gqlite/build'],
             'libraries': [
-              'libgqlite.dylib'
+              '<!(pwd)/gqlite/build/libgqlite.dylib'
             ],
             'ldflags': [
-              # Ensure runtime linking is relative to sharp.node
+              # Ensure runtime linking is relative to civetkern.node
               '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
             ]
           }
