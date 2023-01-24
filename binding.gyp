@@ -101,13 +101,13 @@
         }],
         ['OS=="mac"', {
           "link_settings": {
-            'library_dirs': ['<!(pwd)/gqlite/build'],
+            'library_dirs': ['<!(pwd)/build/Release'],
             'libraries': [
-              '<!(pwd)/gqlite/build/libgqlite.dylib'
+              '<!(pwd)/build/Release/libgqlite.dylib'
             ],
             'ldflags': [
               # Ensure runtime linking is relative to civetkern.node
-              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
+              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/build/Release\''
             ]
           }
         }]
