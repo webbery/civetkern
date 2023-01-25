@@ -1,10 +1,13 @@
 #include "FileLink.h"
+#include <system_error>
+#include <unistd.h>
 #ifdef WIN32
 #include <windows.h>
 #include <shobjidl.h>
 #include <shlguid.h>
 #else
 #endif
+#include <filesystem>
 #include "util/util.h"
 
 namespace caxios {
@@ -41,12 +44,50 @@ namespace caxios {
         HRESULT hres;
         IShellLink* psl;
         hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&psl);
-        if (SUCCEEDED(hres)) {}
+        if (SUCCEEDED(hres)) {
+            IPersistFile* ppf;
+
+            psl->SetPath(lpszPathObj); 
+            psl->SetDescription(lpszDesc);
+
+            hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
+
+            if (SUCCEEDED(hres)) {
+                WCHAR wsz[MAX_PATH];
+                MultiByteToWideChar(CP_ACP, 0, lpszPathLink, -1, wsz, MAX_PATH);
+                hres = ppf->Save(wsz, TRUE); 
+                ppf->Release();
+            }
+            psl->Release();
+        }
+        if (!SUCCEEDED(hres)) return false;
 #else
+        int err = link(fullpath, linkpath);
+        switch(err) {
+            case EACCES:
+            case EMLINK:
+            case ENOENT:
+            case ENOSPC:
+            case EPERM:
+            case EROFS:
+            return false;
+            case EXDEV: {// 链接在其他文件系统中,直接复制一份
+                std::error_code ec;
+                std::filesystem::copy(fullpath, linkpath, ec);
+            }
+            break;
+            case EEXIST:
+            default:
+            break;
+        }
 #endif
         return true;
     }
 
-    bool FileLink::EraseLinkFile(const char* fullpath){}
+    bool FileLink::EraseLinkFile(const char* fullpath){
+#ifdef WIN32
+#else
+#endif
+    }
 
 }
