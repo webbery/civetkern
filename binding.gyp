@@ -83,7 +83,8 @@
             }
           },
           "libraries": [
-            "<!(echo %cd%)/gqlite/build/Release/gqlite.lib"
+            "<!(echo %cd%)/gqlite/build/Release/gqlite.lib",
+            "Ole32.lib"
           ]
         }],
         ['OS=="linux"', {
