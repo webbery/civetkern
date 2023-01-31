@@ -42,7 +42,6 @@
           '-fexceptions',
           '-Wall',
           '-mmacosx-version-min=10.15',
-          '-Wno-pessimizing-move'
           '-O3'
         ]
       },
@@ -84,7 +83,8 @@
             }
           },
           "libraries": [
-            "<!(echo %cd%)/gqlite/build/Release/gqlite.lib"
+            "<!(echo %cd%)/gqlite/build/Release/gqlite.lib",
+            "Ole32.lib"
           ]
         }],
         ['OS=="linux"', {
@@ -94,7 +94,7 @@
               '-lgqlite'
             ],
             'ldflags': [
-              # Ensure runtime linking is relative to sharp.node
+              # Ensure runtime linking is relative to civetkern.node
               '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
             ]
           }
@@ -105,10 +105,12 @@
             'libraries': [
               'libgqlite.dylib'
             ],
-            'ldflags': [
-              # Ensure runtime linking is relative to sharp.node
-              '-Wl,-s -Wl,--disable-new-dtags -Wl,-rpath=\'<!(pwd)/gqlite/build\''
-            ]
+            'xcode_settings': {
+              'OTHER_LDFLAGS': [
+                # Ensure runtime linking is relative to civetkern.node
+                '-Wl,-rpath,\'@loader_path\''
+              ]
+            }
           }
         }]
       ]

@@ -7,6 +7,7 @@
 #include "log.h"
 #include "gqlite.h"
 #include "datum_type.h"
+#include "FileLink.h"
 
 #define TABLE_FILEID        32    // "file_cur_id"
 
@@ -79,15 +80,11 @@ namespace caxios {
     bool GetFileTags(FileID fileID, Tags& tags);
     std::vector<FileID> GetFilesByClass(const std::vector<std::string>& clazz);
     std::string GetClassInfo(ClassID clsID);
-    uint32_t GetClassParent(const std::string& clazz);
     std::vector<ClassID> GetClassChildren(ClassID parentClsID);
     std::vector<FileID> GetFilesOfClass(uint32_t clsID);
     nlohmann::json ParseMeta(const std::string& meta);
-    void SetSnapStep(FileID fileID, int bit, bool set=true);
-    char GetSnapStep(FileID fileID, nlohmann::json&);
     Snap GetFileSnap(FileID);
     bool InitBinaryTables();
-    bool CanBeQuery(const nlohmann::json& meta);
 
     std::vector<std::vector<FileID>> GetFilesIDByTag(const std::vector<std::string>& tags);
 
@@ -96,8 +93,9 @@ namespace caxios {
     void execGQL(const std::string& gql, std::function<void(gqlite_result*)> func);
   private:
     std::vector<std::string> _binTables;
-    DBFlag _flag = ReadWrite;
     gqlite* _pHandle = nullptr;
+    std::string _root;
+    FileLink _flink;
   };
   
 }

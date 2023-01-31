@@ -72,7 +72,6 @@ namespace caxios {
 
   CivetStorage::CivetStorage(const std::string& dbdir, int flag, const std::string& meta/* = ""*/)
   {
-    _flag = (flag == 0 ? ReadWrite : ReadOnly);
     T_LOG("Storage", "Create Database in %s", dbdir.c_str());
     if (gqlite_open(&_pHandle, dbdir.c_str()) != ECode_Success) {
         printf("Create Database Error\n");
@@ -87,6 +86,8 @@ namespace caxios {
     //  }
     //}
     //TryUpdate(meta);
+
+    _root = dbdir;
   }
 
   CivetStorage::~CivetStorage()
@@ -136,10 +137,16 @@ namespace caxios {
 
   bool CivetStorage::AddClasses(const std::vector<std::string>& classes, const std::vector<FileID>& filesID)
   {
-    if (_flag == ReadOnly || classes.size() == 0) return false;
     auto classesID = AddClassImpl(classes);
 
     for (FileID fid : filesID) {
+      std::string gqlQueryOldClass = "{query: '" TABLE_RELATION_CLASS_FILE "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(fid) + "}};";
+      std::vector<std::string> oldClasses;
+      execGQL(gqlQueryOldClass, [&](gqlite_result* result) {
+        //oldClasses.push_back();
+        });
+      
+
       std::string gqlClear = std::string("{remove: '") + TABLE_RELATION_CLASS_FILE + "', edge: [" + std::to_string(fid) + ", --, *]};";
       execGQL(gqlClear);
 
@@ -151,10 +158,29 @@ namespace caxios {
       std::string gqlSnap = "{query: '" TABLE_FILESNAP "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(fid) + "}};";
 
       uint8_t stepBit = 0;
+      std::string filename;
       execGQL(gqlSnap, [&](gqlite_result* result) {
         nlohmann::json snap = nlohmann::json::parse(result->nodes->_vertex->properties);
         stepBit = (uint8_t)snap["step"];
+        filename = snap["name"];
         });
+
+      std::string realPath;
+      // 移除原来的分类路径
+      for (auto& oldPath : oldClasses) {
+        std::string linkpath = oldPath + "/" + filename;
+        if (realPath.empty()) {
+          _flink.ReadLinkFile(linkpath.c_str(), realPath);
+        }
+        _flink.EraseLinkFile(linkpath.c_str());
+      }
+      // 重建新的分类路径
+      for (auto& newPath : classes) {
+        std::string linkpath = newPath + "/" + filename;
+        if (!realPath.empty()) {
+          _flink.CreateLinkFile(realPath.c_str(), linkpath.c_str());
+        }
+      }
 
       std::string gqlUpsetSnap = "{upset: '" TABLE_FILESNAP "', property: [{step: " + std::to_string(stepBit | BIT_CLASS) + "}], where: {id: "
         + std::to_string(fid) + "}};";
@@ -206,7 +232,6 @@ namespace caxios {
     for (FileID fid : files) {
       std::string gql = "{upset: '" TABLE_FILE "', property: [{" + name + ":" + value + "}], where: {id: " + std::to_string(fid) + "}};";
       execGQL(gql);
-      // printf("upset gql: %s\n", gql.c_str());
 
       if (name == "tag" || name == "keyword" || name == "class") {
         std::string gqlKeyword = "{upset: '" TABLE_RELATION_KEYWORD "', edge: [" + std::to_string(fid) + ", --, " + value + "]};";
@@ -356,6 +381,7 @@ namespace caxios {
       std::list<IGQLExecutor*> tasks;
       std::string gql = "{query: '" TABLE_FILE "', in: '" GRAPH_NAME "', where: {id: " + std::to_string(fileID) + "}};";
       MetaItems items;
+      std::string filename;
       execGQL(gql, [&](gqlite_result* result) {
         if (result->count == 0) return;
 
@@ -381,6 +407,9 @@ namespace caxios {
               item["value"] = val;
             }
           }
+          if (obj.key() == "filename") {
+            filename = obj.value();
+          }
           items.emplace_back(item);
         }
         });
@@ -401,7 +430,11 @@ namespace caxios {
       });
 
       for (uint64_t cid: classID) {
-        classes.push_back(GetClassInfo(cid));
+        std::string classPath = GetClassInfo(cid);
+        std::string repoPath = _root + classPath + "/" + filename;
+        if (!_flink.ReadLinkFile(repoPath.c_str(), classPath)) {
+        }
+        classes.push_back(classPath);
       }
 
       Keywords keywords;
@@ -849,17 +882,6 @@ namespace caxios {
     return true;
   }
 
-  bool CivetStorage::CanBeQuery(const nlohmann::json& meta)
-  {
-    //std::string name = meta["name"];
-    //if (m_pDatabase->GetMetaTable(name)) return true;
-    //std::string type = meta["type"];
-    //if (meta.contains("query") && meta["query"] == true && type != "bin") {
-    //  return true;
-    //}
-    return false;
-  }
-
   bool CivetStorage::Query(const std::string& query, std::vector<FileInfo>& filesInfo)
   {
     nlohmann::json condition = nlohmann::json::parse(query);
@@ -984,6 +1006,8 @@ namespace caxios {
   {
     using namespace nlohmann;
     json data;
+    std::string fullpath;
+    std::string name;
     for (MetaItem m : meta)
     {
       std::string key(m["name"]);
@@ -1003,6 +1027,12 @@ namespace caxios {
       }
       else {
         data[key] = value;
+        if (key == "path") {
+          fullpath = value;
+        }
+        else if (key == "filename") {
+          name = value;
+        }
       }
     }
     for (const std::string& kw : keywords) {
@@ -1014,32 +1044,16 @@ namespace caxios {
     }
     else {
       gql = std::string("{upset: '") + TABLE_FILE + "', vertex: [[" + std::to_string(fileid) + ", " + gql + "]]};";
-      // printf("add file: %s\n", gql.c_str());
     }
-    T_LOG("CivetStorage", "%s", gql.c_str());
+    T_LOG("CivetStorage", "add: %s", gql.c_str());
     execGQL(gql);
+    std::string linkfile = _root + "/" + name;
+    _flink.CreateLinkFile(fullpath.c_str(), linkfile.c_str());
 
     gql = std::string("{upset: '") + TABLE_FILESNAP + "', vertex: [["
       + std::to_string(fileid) + ", {name: '" + std::string(data["filename"]) +"', step: 1}]]};";
     execGQL(gql);
 
-    return true;
-  }
-
-  bool CivetStorage::AddFileID2Class(const std::vector<FileID>& filesID, uint32_t clsID)
-  {
-    //for (auto fileID : filesID) {
-    //  void* pData = nullptr;
-    //  uint32_t len = 0;
-    //  m_pDatabase->Get(TABLE_FILE2CLASS, fileID, pData, len);
-    //  std::vector<uint32_t> vClasses;
-    //  if (len) {
-    //    vClasses.assign((uint32_t*)pData, (uint32_t*)pData + len / sizeof(uint32_t));
-    //  }
-    //  addUniqueDataAndSort(vClasses, clsID);
-    //  T_LOG(TABLE_FILE2CLASS, "add class to file, fileID: %u, class: %s, new class: %u", fileID, format_vector(vClasses).c_str(), clsID);
-    //  m_pDatabase->Put(TABLE_FILE2CLASS, fileID, vClasses.data(), vClasses.size()*sizeof(uint32_t));
-    //}
     return true;
   }
 
