@@ -41,6 +41,21 @@
 #define BIT_CLASS   (1<<BIT_CLASS_OFFSET)
 //#define BIT_ANNO  (1<<3)
 
+/*
+原来的相似度计算是将rgb转lab距离，阈值为40, 后续数据库支持再调整算法
+unsigned char r1 = rgb1 >> 16;
+unsigned char g1 = (rgb1 >> 8 ) & 255;
+unsigned char b1 = rgb1 & 255;
+unsigned char r2 = rgb2 >> 16;
+unsigned char g2 = (rgb2 >> 8) & 255;
+unsigned char b2 = rgb2 & 255;
+float r = (r1 + r2) / 2.0;
+float dr = r1 - r2;
+float dg = g1 - g2;
+float db = b1 - b2;
+float d = sqrt((2 + r / 256) * dr * dr + 4 * dg * dg + (2 + (255 - r) / 256) * db * db);
+*/
+
 namespace caxios {
   const char* g_tables[] = {
     TABLE_SCHEMA,
@@ -53,6 +68,20 @@ namespace caxios {
     TABLE_MATCH_META,
     TABLE_MATCH
   };
+
+  double color_distance(nlohmann::json& rgb1, nlohmann::json& rgb2) {
+    unsigned char r1 = rgb1[0];
+    unsigned char g1 = rgb1[1];
+    unsigned char b1 = rgb1[2];
+    unsigned char r2 = rgb2[0];
+    unsigned char g2 = rgb2[1];
+    unsigned char b2 = rgb2[2];
+    float r = (r1 + r2) / 2.0;
+    float dr = r1 - r2;
+    float dg = g1 - g2;
+    float db = b1 - b2;
+    return sqrt((2 + r / 256) * dr * dr + 4 * dg * dg + (2 + (255 - r) / 256) * db * db);
+  }
 
   int gqlite_callback_func(gqlite_result* result, void* handle) {
     if (result->errcode != ECode_Success) return result->errcode;
@@ -73,7 +102,13 @@ namespace caxios {
   CivetStorage::CivetStorage(const std::string& dbdir, int flag, const std::string& meta/* = ""*/)
   {
     T_LOG("Storage", "Create Database in %s", dbdir.c_str());
-    if (gqlite_open(&_pHandle, dbdir.c_str()) != ECode_Success) {
+    if (!exist(dbdir)) {
+#ifdef __linux__
+      createDirectories(dbdir);
+#endif
+    }
+    std::string db = dbdir + "/civet";
+    if (gqlite_open(&_pHandle, db.c_str()) != ECode_Success) {
         printf("Create Database Error\n");
         return;
     }
@@ -81,8 +116,8 @@ namespace caxios {
     // open all database
     InitTable(meta);
     //if (_flag == ReadWrite) {
-    //  if (!IsClassExist(ROOT_CLASS_PATH)) {
     //    InitClass(ROOT_CLASS_PATH, 0, 0);
+    //  if (!IsClassExist(ROOT_CLASS_PATH)) {
     //  }
     //}
     //TryUpdate(meta);
@@ -944,6 +979,8 @@ namespace caxios {
       condition.erase("class");
     }
 
+    std::vector<std::pair<std::string, nlohmann::json>> nearProperties;
+
     std::string restCond;
     bool queryAll = false;
     for (auto& item: condition.items()) {
@@ -954,7 +991,9 @@ namespace caxios {
       
       if (value.find("$near:") != std::string::npos) {
         // 转换查询格式,颜色的笛卡尔距离<10
-        value = "{$near: {$geometry: " + item.value()["$near"].dump() + ", $lt: 20}}";
+        // value = "{$near: {$geometry: " + item.value()["$near"].dump() + ", $lt: 40}}";
+        nearProperties.push_back(std::make_pair(std::string(item.key()), item.value()["$near"]));
+        continue;
       }
       restCond += "{" + std::string(item.key()) + ": " + value + "}";
       restCond += ",";
@@ -971,7 +1010,18 @@ namespace caxios {
 
       printf("query gql: %s\n", gql.c_str());
       execGQL(gql, [&](gqlite_result* result) {
-        // printf("query %s\n", result->nodes->_vertex->properties);
+        printf("query %s\n", result->nodes->_vertex->properties);
+        if (nearProperties.size()) {
+          nlohmann::json propers = nlohmann::json::parse(result->nodes->_vertex->properties);
+          for (auto& prop: nearProperties) {
+            if (prop.first == "color") {
+              auto color = propers[prop.first];
+              auto& dst = prop.second;
+              if (color_distance(color, dst) < 20) return;
+            }
+          }
+        }
+        
         sFilesID.insert(result->nodes->_vertex->uid);
       });
       // printf("query end\n");

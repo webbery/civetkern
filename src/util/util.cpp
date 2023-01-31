@@ -251,17 +251,17 @@ namespace caxios {
     uint32_t bit = 0xFF;
     std::vector<u_char> color;
     int rgbIndex = 3;
-    if (input >= 0xFFFFFF00) {
-      rgbIndex = 4;
-    }
+    // if (input >= 0xFFFFFF00) {
+    //   rgbIndex = 4;
+    // }
     for (char i = 0; i < rgbIndex; ++i) {
       color.insert(color.begin(), (input & bit) >> (i*8));
       bit <<= 8;
     }
     
-    if (rgbIndex == 3) {
-      color.push_back(0);
-    }
+    // if (rgbIndex == 3) {
+    //   color.push_back(0);
+    // }
     return color;
   }
 

@@ -80,8 +80,8 @@ describe('civetkern add test', function() {
     willBeAdd.push({
       'id': fileids[2],
       'meta': [
-        {"name":"path","type":"str","value":"C:\\Users\\webberg\\Pictures\\06cc22608a1111eab5a4993e17631b31.jpg~tplv-banciyuan-w650.png"},
-        {"name":"filename","type":"str","value":"06cc22608a1111eab5a4993e17631b31.jpg~tplv-banciyuan-w650.png"},
+        {"name":"path","type":"str","value":"/home/webbery/data/aa.jpg"},
+        {"name":"filename","type":"str","value":"aa.jpg"},
         {"name":"size","type":"int","value":267028},
         //{"name":"datetime","type":"date","value":t.getTime()},
         {"name":"hash","type":"str","value":"unknow"},

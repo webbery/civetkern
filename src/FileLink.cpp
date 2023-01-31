@@ -31,11 +31,15 @@ namespace caxios {
 
 
     FileLink::FileLink() {
+#ifdef WIN32
       CoInitialize(NULL);
+#endif
     }
 
     FileLink::~FileLink() {
+#ifdef WIN32
       CoUninitialize();
+#endif
     }
 
     bool FileLink::CreateLinkDirectory(const char* fullpath) {
@@ -81,6 +85,7 @@ namespace caxios {
         }
 #else
         int err = link(fullpath, linkpath);
+        printf("add link(%d): %s -> %s\n", err, fullpath, linkpath);
         switch(err) {
             case EACCES:
             case EMLINK:
